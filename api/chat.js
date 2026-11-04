@@ -1,21 +1,31 @@
 
-export const config = {
-  runtime: 'nodejs'
-};
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const API_KEY = process.env.API_KEY;
+    const key = process.env.API_KEY;
 
-    if (!API_KEY) {
-      return res.status(500).json({ error: 'API_KEY не настроен в Vercel' });
+    if (!key) {
+      return res.status(500).json({ error: 'API_KEY не настроен' });
     }
 
-    const { messages } = req.body || {};
+    const body = typeof req.body === 'string'
+      ? JSON.parse(req.body)
+      : req.body;
+
+    const messages = body?.messages;
+    const mode = body?.mode || 'normal';
+
+    const models = {
+      normal: 'am/nemotron-3-ultra-550b-a55b',
+      flash: 'gemini-3-flash'
+    };
+
+    if (!models[mode]) {
+      return res.status(400).json({ error: 'Неизвестный режим' });
+    }
 
     if (!Array.isArray(messages) || !messages.length) {
       return res.status(400).json({ error: 'Нет сообщений' });
@@ -26,19 +36,19 @@ export default async function handler(req, res) {
         ['user', 'assistant'].includes(m.role) &&
         typeof m.content === 'string'
       )
-      .slice(-30);
+      .slice(-40);
 
     const response = await fetch(
       'https://anymodel.org/v1/chat/completions',
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${API_KEY}`,
+          'Authorization': `Bearer ${key}`,
           'Content-Type': 'application/json',
           'Accept': 'text/event-stream'
         },
         body: JSON.stringify({
-          model: 'am/nemotron-3-ultra-550b-a55b',
+          model: models[mode],
           messages: safeMessages,
           stream: true
         })
@@ -47,10 +57,11 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const error = await response.text();
+
       console.error('API ERROR:', response.status, error);
 
       return res.status(502).json({
-        error: `Ошибка API ${response.status}: ${error.slice(0, 400)}`
+        error: `API ${response.status}: ${error.slice(0, 350)}`
       });
     }
 
@@ -64,7 +75,7 @@ export default async function handler(req, res) {
       const error = await response.text();
 
       return res.status(502).json({
-        error: 'API вернул не SSE: ' + error.slice(0, 300)
+        error: 'Неправильный формат ответа: ' + error.slice(0, 300)
       });
     }
 
@@ -73,13 +84,14 @@ export default async function handler(req, res) {
     res.setHeader('X-Accel-Buffering', 'no');
 
     for await (const chunk of response.body) {
+      if (res.destroyed) break;
       res.write(chunk);
     }
 
     res.end();
 
   } catch (error) {
-    console.error(error);
+    console.error('SERVER ERROR:', error);
 
     if (!res.headersSent) {
       return res.status(500).json({
