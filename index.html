@@ -305,7 +305,7 @@ button {color:inherit;cursor:pointer}
 .msgs {flex:1;overflow:auto;scroll-behavior:smooth}
 .wrap {max-width:760px;margin:0 auto;padding:16px 18px 24px}
 .row {display:flex;gap:10px;margin:14px 0}
-.row.u {justify-content:flex-end}
+.row.u {justify-content:flex-end;align-items:flex-start}
 .bub {
   min-width:0;
   max-width:100%;
@@ -314,11 +314,18 @@ button {color:inherit;cursor:pointer}
   line-height:1.5;
 }
 .u .bub {
+  display:block;
+  width:fit-content;
+  height:auto;
+  min-height:0;
+  align-self:flex-start;
+  flex:0 1 auto;
   background:var(--user);
   padding:7px 12px;
   border-radius:16px;
   max-width:78%;
   white-space:pre-wrap;
+  text-align:left;
 }
 .bub p {margin:0 0 .6em}
 .bub p:last-child {margin:0}
@@ -760,8 +767,7 @@ textarea::placeholder {color:var(--muted)}
           accept="image/*,.pdf,.txt,.md,.json,.csv,.html,.htm,.css,.js,.mjs,.ts,.tsx,.jsx,.py,.lua,.java,.c,.cpp,.h,.cs,.go,.rs,.sql,.xml,.yaml,.yml,.toml,.ini,.log,.sh,.docx,.xlsx" />
 
         <select class="model-select" id="modelSelect" title="Модель">
-          <option value="ag/gemini-3.1-flash-lite-preview">⚡ Flash</option>
-          <option value="cc/claude-sonnet-5-5">🧠 High</option>
+          <option value="nvidia/nemotron-3-ultra-550b-a55b:free">Flash</option>
         </select>
 
         <button class="send" id="send" disabled
@@ -858,7 +864,7 @@ googleProvider.setCustomParameters({
 
 const $ = id => document.getElementById(id);
 
-const API_URL = "/api/chat";
+const API_URL = "/api";
 
 const LEGACY_DEFAULT_SYS =
   "Ты Venus AI — дружелюбный и умный ИИ-помощник. Отвечай на языке пользователя.";
@@ -893,11 +899,26 @@ const DEFAULT_SYS = `Ты Venus AI — сильный и практичный И
 - При неоднозначностях выбирай разумные настройки самостоятельно; задавай вопрос только при реальной необходимости.`;
 
 const MODELS = {
-  flash: "ag/gemini-3.1-flash-lite-preview",
-  high: "cc/claude-sonnet-5-5"
+  auto: "nvidia/nemotron-3-ultra-550b-a55b:free",
+  flash: "nvidia/nemotron-3-ultra-550b-a55b:free",
+  medium: "nvidia/nemotron-3-ultra-550b-a55b:free"
 };
 
-const ALL_MODEL_VALUES = new Set(Object.values(MODELS));
+// Free OpenRouter models, ordered by the preferred fallback priority.
+// The API will use the first available model and return ONE answer.
+const FREE_MODEL_POOL = [
+  "nvidia/nemotron-3-ultra-550b-a55b:free"
+];
+
+// Restrict image prompts to models with confirmed image input support.
+const IMAGE_MODEL_POOL = [
+  "nvidia/nemotron-3-ultra-550b-a55b:free"
+];
+
+const ALL_MODEL_VALUES = new Set([
+  MODELS.auto,
+  ...FREE_MODEL_POOL
+]);
 
 const store = {
 
@@ -1200,10 +1221,10 @@ onAuthStateChanged(auth,user => {
     : savedSystem;
   if (!savedSystem || savedSystem === LEGACY_DEFAULT_SYS) saveSystem();
 
-  const selectedModel = store.get(modelKey(settingsId),MODELS.flash);
+  const selectedModel = store.get(modelKey(settingsId),MODELS.auto);
   $("modelSelect").value = ALL_MODEL_VALUES.has(selectedModel)
     ? selectedModel
-    : MODELS.flash;
+    : MODELS.auto;
 
   $("accountName").textContent = user
     ? (user.displayName || "Пользователь")
@@ -1645,6 +1666,10 @@ async function addFiles(fileList) {
       const record=await prepareFile(file);
       pendingAttachments.push(record);
     }
+    if(pendingAttachments.some(a=>a.kind==="image") && $("modelSelect").value!==MODELS.medium) {
+      $("modelSelect").value=MODELS.medium;
+      if(currentUser) store.set(modelKey(currentUser.uid),MODELS.medium);
+    }
     renderPendingAttachments();
     upd();
   } catch(e) {
@@ -1801,17 +1826,27 @@ async function send(text,attachmentsOverride=null) {
     const messages=await buildApiMessages(c);
     const userPayloads=messages.filter(x=>x.role==="user");
     if(!userPayloads.length) throw new Error("Нет сообщений для отправки.");
+    const hasImages = messages.some(m=>Array.isArray(m.content));
     const selectedModel=$("modelSelect").value;
+    const availablePool = hasImages ? IMAGE_MODEL_POOL : FREE_MODEL_POOL;
+    const selectedWorksForInput = !hasImages || availablePool.includes(selectedModel);
+    const requestModels = selectedModel === MODELS.auto || !selectedWorksForInput
+      ? availablePool.slice()
+      : [selectedModel,...availablePool.filter(m=>m!==selectedModel)];
 
-    const r=await fetch(API_URL,{
+    // OpenRouter tries these models in order if an earlier model/provider fails.
+    // This is one routed request and produces one assistant answer, not one answer per model.
+    const r=await fetch(API_URL+"?p=chat/completions",{
       method:"POST",
       signal:ctrl.signal,
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
-        model:selectedModel,
+        model:requestModels[0],
+        models:requestModels,
         messages,
         stream:true,
-        max_tokens:8192
+        max_tokens:8192,
+        provider:{allow_fallbacks:true}
       })
     });
 
