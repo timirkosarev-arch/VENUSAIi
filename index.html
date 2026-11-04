@@ -1,31 +1,357 @@
 
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#101014">
+<title>My AI</title>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+
+body{
+ background:#101014;
+ color:#f5f5f7;
+ font-family:Arial,sans-serif;
+ height:100dvh;
+ overflow:hidden;
+}
+
+.app{
+ height:100dvh;
+ width:100%;
+ display:flex;
+ flex-direction:column;
+ max-width:1000px;
+ margin:auto;
+}
+
+header{
+ height:65px;
+ flex-shrink:0;
+ display:flex;
+ align-items:center;
+ justify-content:space-between;
+ padding:0 20px;
+ border-bottom:1px solid #292930;
+}
+
+.brand{
+ display:flex;
+ align-items:center;
+ gap:11px;
+}
+
+.logo{
+ width:38px;
+ height:38px;
+ display:grid;
+ place-items:center;
+ border-radius:13px;
+ background:linear-gradient(135deg,#7655ff,#348cff);
+ font-weight:bold;
+}
+
+.brand h2{font-size:17px}
+.brand small{color:#888;font-size:11px}
+
+.newchat{
+ border:1px solid #393943;
+ background:#202027;
+ color:white;
+ padding:10px 14px;
+ border-radius:12px;
+ cursor:pointer;
+}
+
+#messages{
+ flex:1;
+ overflow-y:auto;
+ display:flex;
+ flex-direction:column;
+ gap:20px;
+ padding:25px 18px;
+ scroll-behavior:smooth;
+}
+
+.welcome{
+ margin:auto;
+ text-align:center;
+ color:#92929d;
+}
+
+.welcome .big{
+ font-size:45px;
+ margin-bottom:15px;
+}
+
+.welcome h1{
+ font-size:29px;
+ color:white;
+ margin-bottom:10px;
+}
+
+.welcome p{font-size:14px}
+
+.message{
+ max-width:85%;
+ padding:13px 16px;
+ border-radius:17px;
+ line-height:1.65;
+ font-size:15px;
+ white-space:pre-wrap;
+ overflow-wrap:anywhere;
+}
+
+.user{
+ align-self:flex-end;
+ background:#6950d6;
+ border-bottom-right-radius:5px;
+}
+
+.bot{
+ align-self:flex-start;
+ background:#222229;
+ border:1px solid #303039;
+ border-bottom-left-radius:5px;
+}
+
+.bot.error{
+ color:#ff9292;
+}
+
+.typing{
+ display:flex;
+ gap:5px;
+ padding:6px 0;
+}
+
+.typing span{
+ width:7px;
+ height:7px;
+ border-radius:50%;
+ background:#aaa;
+ animation:blink 1s infinite alternate;
+}
+
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+
+@keyframes blink{
+ from{opacity:.3;transform:translateY(0)}
+ to{opacity:1;transform:translateY(-4px)}
+}
+
+.bottom{
+ width:100%;
+ padding:12px 18px 18px;
+}
+
+.inputbox{
+ display:flex;
+ align-items:flex-end;
+ gap:10px;
+ background:#202027;
+ border:1px solid #393943;
+ border-radius:19px;
+ padding:9px;
+ transition:border .2s;
+}
+
+.inputbox:focus-within{
+ border-color:#8066ed;
+}
+
+textarea{
+ flex:1;
+ min-width:0;
+ resize:none;
+ max-height:140px;
+ min-height:43px;
+ padding:12px 8px;
+ background:transparent;
+ color:white;
+ border:none;
+ outline:none;
+ font-size:16px;
+ font-family:inherit;
+ line-height:1.4;
+}
+
+textarea::placeholder{color:#777}
+
+.send{
+ width:43px;
+ height:43px;
+ border:none;
+ border-radius:14px;
+ background:#7658ef;
+ color:white;
+ font-size:22px;
+ cursor:pointer;
+ flex-shrink:0;
+ transition:.2s;
+}
+
+.send:active{transform:scale(.92)}
+.send:disabled{opacity:.45;cursor:default}
+
+.note{
+ text-align:center;
+ color:#73737c;
+ font-size:11px;
+ margin-top:10px;
+}
+
+@media(max-width:600px){
+ header{height:58px;padding:0 13px}
+ #messages{padding:18px 12px;gap:16px}
+ .message{max-width:91%;font-size:15px}
+ .bottom{
+  padding:9px 10px calc(10px + env(safe-area-inset-bottom));
+ }
+ .welcome h1{font-size:25px}
+ .newchat{padding:9px 11px;font-size:12px}
+}
+</style>
+</head>
+
+<body>
+<div class="app">
+
+<header>
+ <div class="brand">
+  <div class="logo">AI</div>
+  <div>
+   <h2>My AI</h2>
+   <small>Умный помощник</small>
+  </div>
+ </div>
+
+ <button class="newchat" id="newChat">＋ Новый чат</button>
+</header>
+
+<main id="messages">
+ <div class="welcome" id="welcome">
+  <div class="big">✦</div>
+  <h1>Чем займёмся?</h1>
+  <p>Задай любой вопрос своему ИИ</p>
+ </div>
+</main>
+
+<div class="bottom">
+ <div class="inputbox">
+  <textarea
+   id="input"
+   rows="1"
+   placeholder="Напиши сообщение..."
+  ></textarea>
+
+  <button class="send" id="send">↑</button>
+ </div>
+ <div class="note">My AI может ошибаться. Проверяй важную информацию.</div>
+</div>
+
+</div>
+
+<script>
+const messages=document.getElementById('messages');
+const input=document.getElementById('input');
+const send=document.getElementById('send');
+const newChat=document.getElementById('newChat');
+
+let history=[];
+let busy=false;
+
+function scrollBottom(){
+ messages.scrollTop=messages.scrollHeight;
+}
+
+function addMessage(text,role){
+ const el=document.createElement('div');
+ el.className='message '+role;
+ el.textContent=text;
+ messages.appendChild(el);
+ scrollBottom();
+ return el;
+}
+
+function showTyping(){
+ const el=document.createElement('div');
+ el.className='message bot';
+ el.id='typing';
+
+ el.innerHTML='<div class="typing"><span></span><span></span><span></span></div>';
+
+ messages.appendChild(el);
+ scrollBottom();
+ return el;
+}
+
+function newConversation(){
+ if(busy)return;
+
+ history=[];
+ messages.innerHTML=`
+ <div class="welcome" id="welcome">
+  <div class="big">✦</div>
+  <h1>Чем займёмся?</h1>
+  <p>Задай любой вопрос своему ИИ</p>
+ </div>`;
+
+ input.value='';
+ input.focus();
+}
+
 async function sendMessage(){
  const text=input.value.trim();
+
  if(!text||busy)return;
 
  busy=true;
  send.disabled=true;
  document.getElementById('welcome')?.remove();
 
- input.value='';
- input.style.height='auto';
-
  addMessage(text,'user');
  history.push({role:'user',content:text});
 
- const answer=addMessage('Думаю...','bot');
+ input.value='';
+ input.style.height='auto';
+
+ const typing=showTyping();
 
  try{
   const response=await fetch('/api/chat',{
    method:'POST',
-   headers:{'Content-Type':'application/json'},
-   body:JSON.stringify({messages:history})
+   headers:{
+    'Content-Type':'application/json'
+   },
+   body:JSON.stringify({
+    messages:history
+   })
   });
 
   if(!response.ok){
-   const data=await response.json();
-   throw new Error(data.error||'Ошибка API');
+   const raw=await response.text();
+   let error=raw;
+
+   try{
+    error=JSON.parse(raw).error||raw;
+   }catch(e){}
+
+   throw new Error(error);
   }
+
+  const contentType=response.headers.get('content-type')||'';
+
+  if(!contentType.includes('text/event-stream')){
+   throw new Error('Сервер вернул неправильный формат ответа');
+  }
+
+  typing.remove();
+
+  const answer=addMessage('','bot');
 
   const reader=response.body.getReader();
   const decoder=new TextDecoder();
@@ -33,10 +359,9 @@ async function sendMessage(){
   let buffer='';
   let result='';
 
-  answer.textContent='';
-
   while(true){
    const {done,value}=await reader.read();
+
    if(done)break;
 
    buffer+=decoder.decode(value,{stream:true});
@@ -48,30 +373,75 @@ async function sendMessage(){
     if(!line.startsWith('data:'))continue;
 
     const data=line.slice(5).trim();
+
     if(!data||data==='[DONE]')continue;
 
     try{
      const json=JSON.parse(data);
+
+     if(json.error){
+      throw new Error(json.error.message||'Ошибка модели');
+     }
+
      const part=json.choices?.[0]?.delta?.content;
 
      if(typeof part==='string'){
       result+=part;
       answer.textContent=result;
-      messages.scrollTop=messages.scrollHeight;
+      scrollBottom();
      }
-    }catch(e){}
+    }catch(e){
+     if(e instanceof Error&&e.message!==''){
+      if(e.message!=='Unexpected end of JSON input'){
+       console.error(e);
+      }
+     }
+    }
    }
   }
 
-  if(!result)throw new Error('Пустой ответ от модели');
+  if(!result){
+   throw new Error('ИИ не отправил ответ');
+  }
 
-  history.push({role:'assistant',content:result});
+  history.push({
+   role:'assistant',
+   content:result
+  });
 
  }catch(error){
-  answer.textContent='Ошибка: '+error.message;
+  typing.remove();
+
+  const errorMessage=addMessage(
+   '⚠ '+error.message,
+   'bot error'
+  );
+
+  console.error(error);
   history.pop();
+
  }finally{
   busy=false;
   send.disabled=false;
+  input.focus();
  }
 }
+
+send.addEventListener('click',sendMessage);
+
+newChat.addEventListener('click',newConversation);
+
+input.addEventListener('keydown',e=>{
+ if(e.key==='Enter'&&!e.shiftKey){
+  e.preventDefault();
+  sendMessage();
+ }
+});
+
+input.addEventListener('input',()=>{
+ input.style.height='auto';
+ input.style.height=Math.min(input.scrollHeight,140)+'px';
+});
+</script>
+</body>
+</html>
