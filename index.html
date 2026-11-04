@@ -1747,6 +1747,8 @@ async function buildApiMessages(chat) {
     }
   }
 
+  // Запоминаем прямые ImgBB-ссылки, чтобы изображения оставались доступны после перезагрузки.
+  saveChats();
   return messages;
 }
 
@@ -1804,7 +1806,8 @@ async function send(text,attachmentsOverride=null) {
   }
 
   const storedAttachments=chosenAttachments.map(a=>({
-    mediaId:a.mediaId,name:a.name,type:a.type,kind:a.kind
+    mediaId:a.mediaId,name:a.name,type:a.type,kind:a.kind,
+    remoteUrl:a.remoteUrl||""
   }));
 
   c.messages.push({role:"user",content:text,attachments:storedAttachments});
