@@ -28,6 +28,33 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 @media(max-width:800px){.side{position:fixed;inset:0 auto 0 0;transform:translateX(-100%);width:min(280px,85vw)}.side.on{transform:none}.back.on{display:block;position:fixed;inset:0;background:#0009;z-index:15}.burger{display:block}}
 @media(max-width:600px){.top{padding-left:10px;padding-right:10px}.wrap{padding:10px 12px 20px}.hero{min-height:310px}.hero h1{font-size:24px}.comp{padding:8px 9px calc(10px + env(safe-area-inset-bottom,0px))}.u .bub{max-width:88%}.bub{font-size:14px}.top-mode{max-width:145px;font-size:11px}.attachment-tray{padding:0 4px}}
 ::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
+
+/* Smooth UI motion and clear chat-title contrast */
+.chat{transition:background .22s ease,transform .22s ease,box-shadow .22s ease;animation:chatEnter .28s ease both}
+.chat-title,.chat-delete{transition:color .2s ease,opacity .2s ease,background .2s ease}
+.chat-title,.chat.on .chat-title{color:#fff!important}
+.chat-title:hover{color:#fff!important}
+.row{animation:messageEnter .32s cubic-bezier(.2,.75,.25,1) both}
+.bub{animation:bubbleEnter .28s ease both}
+.hero{animation:heroEnter .5s cubic-bezier(.2,.75,.25,1) both}
+.new,.sugs button,.attach,.send,.message-actions button,.btn,.auth-primary{transition:background .2s ease,border-color .2s ease,transform .2s ease,box-shadow .2s ease}
+.new:hover,.sugs button:hover,.attach:hover,.send:hover,.message-actions button:hover,.btn:hover{transform:translateY(-1px)}
+.box{transition:border-color .22s ease,box-shadow .22s ease,background .22s ease}
+.box:focus-within{box-shadow:0 0 0 3px #a855f71c,0 8px 28px #0005}
+.side{transition:transform .3s cubic-bezier(.2,.75,.25,1),box-shadow .3s ease}
+.back{animation:fadeIn .2s ease both}
+.mod.on .card{animation:modalEnter .25s cubic-bezier(.2,.75,.25,1) both}
+.attachment-item{animation:attachmentEnter .22s ease both}
+.send:active,.attach:active,.new:active{transform:scale(.96)}
+@keyframes chatEnter{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@keyframes messageEnter{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
+@keyframes bubbleEnter{from{opacity:.65}to{opacity:1}}
+@keyframes heroEnter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes modalEnter{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes attachmentEnter{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
+
 </style>
 </head>
 <body>
@@ -56,7 +83,8 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
    <div class="title" id="ttl">Venus AI</div>
    <select class="top-mode" id="modelSelect" aria-label="Режим модели">
     <option value="normal">Обычный · Nemotron</option>
-    <option value="flash">⚡ Flash · Gemini</option>
+    <option value="flash">⚡ Flash · Gemini 3.1</option>
+    <option value="high">🧠 High · Claude Sonnet 5.5</option>
    </select>
   </div>
   <div class="msgs" id="msgs"><div class="wrap" id="wrap"></div></div>
@@ -144,8 +172,8 @@ function renderList(){const list=$('list');list.replaceChildren();[...chats].sor
  row.append(title,del);list.append(row);
  })}
 function deleteChat(id){if(busy)return;const c=chats.find(x=>x.id===id);if(!c)return;if(!confirm(`Удалить чат «${c.title}»?`))return;chats=chats.filter(x=>x.id!==id);if(activeId===id)activeId=chats[0]?.id||null;saveChats();renderAll()}
-function setModeUI(mode){const safe=mode==='flash'?'flash':'normal';$('modelSelect').value=safe;saveModel(safe);const c=active();if(c){c.mode=safe;c.updatedAt=Date.now();saveChats()}}
-function renderAll(){renderList();renderMessages();const c=active();$('ttl').textContent=c?.title||'Venus AI';$('modelSelect').value=c?.mode||readStore(MODEL_KEY+(currentUser?.uid||'guest'),'normal');$('accountName').textContent=currentUser.displayName||'Гость';$('accountEmail').textContent=currentUser.email||'История на этом устройстве';$('logoutBtn').hidden=currentUser.uid==='guest';$('registerBtn').hidden=currentUser.uid!=='guest';requestAnimationFrame(scrollBottom)}
+function setModeUI(mode){const safe=['normal','flash','high'].includes(mode)?mode:'normal';$('modelSelect').value=safe;saveModel(safe);const c=active();if(c){c.mode=safe;c.updatedAt=Date.now();saveChats()}}
+function renderAll(){renderList();renderMessages();const c=active();$('ttl').textContent=c?.title||'Venus AI';const savedMode=c?.mode||readStore(MODEL_KEY+(currentUser?.uid||'guest'),'normal');$('modelSelect').value=['normal','flash','high'].includes(savedMode)?savedMode:'normal';$('accountName').textContent=currentUser.displayName||'Гость';$('accountEmail').textContent=currentUser.email||'История на этом устройстве';$('logoutBtn').hidden=currentUser.uid==='guest';$('registerBtn').hidden=currentUser.uid!=='guest';requestAnimationFrame(scrollBottom)}
 
 /* Safe Markdown renderer, including fenced code with copy/download actions. */
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -180,7 +208,7 @@ async function hydrateImages(){for(const img of $('wrap').querySelectorAll('img[
 /* File extraction */
 function extOf(name){return (name.split('.').pop()||'').toLowerCase()}
 function formatBytes(n){return n<1048576?Math.round(n/1024)+' КБ':(n/1048576).toFixed(1)+' МБ'}
-async function imageToDataURL(file){const bitmap=await createImageBitmap(file);const max=1280,scale=Math.min(1,max/Math.max(bitmap.width,bitmap.height));const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();return canvas.toDataURL('image/jpeg',.7)}
+async function imageToDataURL(file){const bitmap=await createImageBitmap(file);const max=960,scale=Math.min(1,max/Math.max(bitmap.width,bitmap.height));const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));const ctx=canvas.getContext('2d',{alpha:false});ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();return canvas.toDataURL('image/jpeg',.62)}
 async function extractPDF(file){const pdfjs=await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs');pdfjs.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';const pdf=await pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;const pages=[];for(let p=1;p<=Math.min(pdf.numPages,35);p++){const page=await pdf.getPage(p);const content=await page.getTextContent();pages.push(content.items.map(x=>x.str).join(' '));if(pages.join('\n').length>MAX_TEXT)break}let result=pages.join('\n\n');if(pdf.numPages>35)result+='\n[Извлечены первые 35 страниц]';return result.slice(0,MAX_TEXT)}
 async function extractDOCX(file){const mod=await import('https://esm.sh/mammoth@1.9.0?bundle');const mammoth=mod.default||mod;const r=await mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()});return (r.value||'').slice(0,MAX_TEXT)}
 async function extractXLSX(file){const XLSX=await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm');const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});const out=[];for(const name of wb.SheetNames){out.push('Лист: '+name+'\n'+XLSX.utils.sheet_to_csv(wb.Sheets[name]));if(out.join('\n').length>MAX_TEXT)break}return out.join('\n\n').slice(0,MAX_TEXT)}
@@ -206,7 +234,7 @@ function autoGrow(){const t=$('inp');t.style.height='auto';t.style.height=Math.m
 function download(content,filename,mime='text/plain;charset=utf-8'){const blob=new Blob([content],{type:mime});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)}
 function extForLanguage(lang){const map={javascript:'js',js:'js',typescript:'ts',ts:'ts',tsx:'tsx',jsx:'jsx',python:'py',py:'py',html:'html',css:'css',json:'json',xml:'xml',yaml:'yml',yml:'yml',markdown:'md',md:'md',sql:'sql',bash:'sh',sh:'sh',lua:'lua',java:'java',c:'c',cpp:'cpp',csharp:'cs',cs:'cs',go:'go',rust:'rs',rs:'rs',php:'php',ruby:'rb',rb:'rb',swift:'swift',kotlin:'kt',text:'txt',txt:'txt'};return map[lang]||'txt'}
 
-async function requestAnswer(chat){if(busy)return;busy=true;controller=new AbortController();updateSendButton();const live=renderLive('');try{const apiMessages=await buildMessages(chat);const response=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({messages:apiMessages,mode:chat.mode||'normal'})});if(!response.ok){const raw=await response.text();let message=raw;try{message=JSON.parse(raw).error||raw}catch{}throw new Error(message.slice(0,600))}if(!response.body)throw new Error('Пустой ответ сервера');const ct=response.headers.get('content-type')||'';let result='';
+async function requestAnswer(chat){if(busy)return;busy=true;controller=new AbortController();updateSendButton();const live=renderLive('');try{const apiMessages=await buildMessages(chat);const requestBody=JSON.stringify({messages:apiMessages,mode:chat.mode||'normal'});if(requestBody.length>4*1024*1024)throw new Error('Слишком большой запрос. Уменьши количество фотографий или отправь их несколькими сообщениями.');const response=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:requestBody});if(!response.ok){const raw=await response.text();let message=raw;try{message=JSON.parse(raw).error||raw}catch{}throw new Error(message.slice(0,600))}if(!response.body)throw new Error('Пустой ответ сервера');const ct=response.headers.get('content-type')||'';let result='';
  if(ct.includes('text/event-stream')){const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='';const parseLine=line=>{line=line.trim();if(!line.startsWith('data:'))return;const data=line.slice(5).trim();if(!data||data==='[DONE]')return;let json;try{json=JSON.parse(data)}catch{return}if(json.error)throw new Error(json.error.message||'Ошибка модели');let piece=json.choices?.[0]?.delta?.content??'';if(Array.isArray(piece))piece=piece.map(x=>x.text||'').join('');if(typeof piece==='string'&&piece){result+=piece;live.innerHTML=markdown(result);scrollBottom()}};while(true){const {done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const lines=buffer.split('\n');buffer=lines.pop();for(const line of lines)parseLine(line)}buffer+=decoder.decode();if(buffer.trim())parseLine(buffer)}
  else{const raw=await response.text();let data;try{data=JSON.parse(raw)}catch{throw new Error('Сервер вернул не JSON и не потоковый ответ: '+raw.slice(0,200))}if(data.error)throw new Error(data.error.message||data.error);const content=data.choices?.[0]?.message?.content??'';result=typeof content==='string'?content:Array.isArray(content)?content.map(x=>x.text||'').join(''):String(content);live.innerHTML=markdown(result)}
  if(!result.trim())throw new Error('Модель не вернула текстовый ответ');chat.messages.push({role:'assistant',content:result});chat.updatedAt=Date.now();saveChats();renderMessages();renderList();
@@ -218,7 +246,7 @@ function stopGeneration(){if(controller)controller.abort()}
 /* Sidebar, settings, composer */
 function openSide(){$('side').classList.add('on');$('back').classList.add('on')}function closeSide(){$('side').classList.remove('on');$('back').classList.remove('on')}
 $('burger').onclick=openSide;$('back').onclick=closeSide;$('newBtn').onclick=()=>{if(!busy)createChat()};$('setBtn').onclick=()=>{if(busy)return;$('systemPrompt').value=systemPrompt;$('settingsModal').classList.add('on');closeSide()};$('closeSettings').onclick=()=>$('settingsModal').classList.remove('on');$('saveSettings').onclick=()=>{systemPrompt=$('systemPrompt').value.trim()||DEFAULT_SYSTEM;saveSystem();$('settingsModal').classList.remove('on')};$('settingsModal').addEventListener('click',e=>{if(e.target===$('settingsModal'))$('settingsModal').classList.remove('on')});
-$('modelSelect').addEventListener('change',()=>{const mode=$('modelSelect').value==='flash'?'flash':'normal';const c=active();if(c){c.mode=mode;c.updatedAt=Date.now();saveChats()}saveModel(mode)});
+$('modelSelect').addEventListener('change',()=>{const selected=$('modelSelect').value;const mode=['normal','flash','high'].includes(selected)?selected:'normal';const c=active();if(c){c.mode=mode;c.updatedAt=Date.now();saveChats()}saveModel(mode)});
 $('attachBtn').onclick=()=>$('fileInput').click();$('fileInput').addEventListener('change',e=>addFiles(e.target.files));$('inp').addEventListener('input',autoGrow);$('inp').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage()}});$('sendBtn').onclick=()=>busy?stopGeneration():sendMessage();
 $('wrap').addEventListener('click',async e=>{const sug=e.target.closest('[data-s]');if(sug){$('inp').value=sug.dataset.s;sendMessage();return}const copyCode=e.target.closest('[data-copy-code]');if(copyCode){const code=copyCode.closest('.pre').querySelector('code').textContent;try{await navigator.clipboard.writeText(code);copyCode.textContent='Скопировано';setTimeout(()=>copyCode.textContent='Копировать',1200)}catch{alert('Не удалось скопировать код')}return}const downCode=e.target.closest('[data-download-code]');if(downCode){const pre=downCode.closest('.pre'),code=pre.querySelector('code').textContent,lang=pre.querySelector('.h span').textContent.toLowerCase();download(code,'venus-ai-code.'+extForLanguage(lang));return}const actions=e.target.closest('.message-actions');if(!actions)return;const idx=Number(actions.dataset.index),chat=active(),message=chat?.messages[idx];if(!message)return;if(e.target.closest('[data-copy-answer]')){try{await navigator.clipboard.writeText(message.content);e.target.textContent='Скопировано'}catch{alert('Не удалось скопировать ответ')}}else if(e.target.closest('[data-share-answer]')){try{if(navigator.share)await navigator.share({title:'Ответ Venus AI',text:message.content});else{await navigator.clipboard.writeText(message.content);alert('Ответ скопирован')}}catch(err){if(err.name!=='AbortError')alert('Не удалось поделиться ответом')}}else if(e.target.closest('[data-download-answer]'))download(message.content,`venus-ai-answer-${idx+1}.md`,'text/markdown;charset=utf-8');else if(e.target.closest('[data-retry]'))retryMessage(idx)});
 
