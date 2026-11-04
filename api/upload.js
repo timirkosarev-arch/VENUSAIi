@@ -1,9 +1,5 @@
 const IMGBB_ENDPOINT = "https://api.imgbb.com/1/upload";
 
-function sendError(res, status, message) {
-  return res.status(status).json({ error: message });
-}
-
 export const config = {
   api: {
     bodyParser: {
@@ -12,16 +8,31 @@ export const config = {
   }
 };
 
+function sendError(res, status, message) {
+  return res.status(status).json({
+    error: message
+  });
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
-    return sendError(res, 405, "Method not allowed");
+
+    return sendError(
+      res,
+      405,
+      "Method not allowed"
+    );
   }
 
-  const key = process.env.IMGBB_API_KEY;
+  const apiKey = process.env.IMGBB_API_KEY;
 
-  if (!key) {
-    return sendError(res, 500, "IMGBB_API_KEY не настроен");
+  if (!apiKey) {
+    return sendError(
+      res,
+      500,
+      "На Vercel не настроена переменная IMGBB_API_KEY."
+    );
   }
 
   try {
@@ -32,52 +43,80 @@ export default async function handler(req, res) {
 
     const image = body?.image;
 
-    if (typeof image !== "string" || !image) {
-      return sendError(res, 400, "Изображение не передано");
+    const name =
+      typeof body?.name === "string"
+        ? body.name
+        : "venus-ai-image";
+
+    if (
+      typeof image !== "string" ||
+      !image.trim()
+    ) {
+      return sendError(
+        res,
+        400,
+        "Изображение не передано."
+      );
     }
 
     if (image.length > 4400000) {
-      return sendError(res, 413, "Изображение слишком большое");
+      return sendError(
+        res,
+        413,
+        "Изображение слишком большое. Попробуй фото меньшего размера."
+      );
     }
 
     const form = new FormData();
+
     form.append("image", image);
 
-    if (typeof body.name === "string") {
-      form.append("name", body.name.slice(0, 120));
-    }
+    form.append(
+      "name",
+      name
+        .replace(/[^a-zA-Z0-9а-яА-ЯёЁ _.-]/g, "_")
+        .slice(0, 120)
+    );
 
-    const response = await fetch(
-      `${IMGBB_ENDPOINT}?key=${encodeURIComponent(key)}`,
+    const upstream = await fetch(
+      `${IMGBB_ENDPOINT}?key=${encodeURIComponent(apiKey)}`,
       {
         method: "POST",
         body: form
       }
     );
 
-    const result = await response.json();
+    const result = await upstream
+      .json()
+      .catch(() => ({}));
 
-    if (!response.ok || !result.success || !result.data?.url) {
-      return sendError(
-        res,
-        502,
-        result.error?.message || "Ошибка ImgBB"
-      );
+    if (
+      !upstream.ok ||
+      !result.success ||
+      !result.data?.url
+    ) {
+      const message =
+        result.error?.message ||
+        `ImgBB вернул ошибку ${upstream.status}.`;
+
+      return sendError(res, 502, message);
     }
 
     return res.status(200).json({
       url: result.data.url,
-      displayUrl: result.data.display_url,
-      viewerUrl: result.data.url_viewer
+      displayUrl:
+        result.data.display_url || result.data.url,
+      viewerUrl:
+        result.data.url_viewer || ""
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("ImgBB upload error:", error);
 
     return sendError(
       res,
       500,
-      "Ошибка загрузки изображения"
+      "Внутренняя ошибка при загрузке изображения."
     );
   }
 }
