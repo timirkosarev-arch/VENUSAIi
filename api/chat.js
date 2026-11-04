@@ -1,4 +1,3 @@
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -6,7 +5,6 @@ export default async function handler(req, res) {
 
   try {
     const key = process.env.API_KEY;
-
     if (!key) {
       return res.status(500).json({ error: 'API_KEY не настроен' });
     }
@@ -20,46 +18,87 @@ export default async function handler(req, res) {
 
     const models = {
       normal: 'am/nemotron-3-ultra-550b-a55b',
-      flash: 'gemini-3-flash'
+      flash: 'ag/gemini-3.1-flash-lite-preview',
+      high: 'cc/claude-sonnet-5-5'
     };
 
-    if (!models[mode]) {
-      return res.status(400).json({ error: 'Неизвестный режим' });
+    if (!Object.prototype.hasOwnProperty.call(models, mode)) {
+      return res.status(400).json({ error: 'Неизвестный режим модели' });
     }
 
-    if (!Array.isArray(messages) || !messages.length) {
+    if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: 'Нет сообщений' });
     }
 
-    const safeMessages = messages
-      .filter(m =>
-        ['user', 'assistant'].includes(m.role) &&
-        typeof m.content === 'string'
-      )
+    // Keep text and OpenAI-compatible image_url parts. The previous handler
+    // accepted only string content, silently dropping every message with photos.
+    function sanitizeContent(content) {
+      if (typeof content === 'string') {
+        return content.slice(0, 150_000);
+      }
+
+      if (!Array.isArray(content)) return null;
+
+      const parts = [];
+      for (const part of content) {
+        if (!part || typeof part !== 'object') continue;
+
+        if (part.type === 'text' && typeof part.text === 'string') {
+          parts.push({ type: 'text', text: part.text.slice(0, 150_000) });
+          continue;
+        }
+
+        if (part.type === 'image_url' && part.image_url &&
+            typeof part.image_url.url === 'string') {
+          const url = part.image_url.url;
+          const isDataImage = /^data:image\/(jpeg|jpg|png|webp|gif);base64,/i.test(url);
+          const isHttpsImage = /^https:\/\//i.test(url);
+          if ((isDataImage || isHttpsImage) && url.length <= 3_800_000) {
+            parts.push({
+              type: 'image_url',
+              image_url: { url, detail: 'auto' }
+            });
+          }
+        }
+      }
+
+      return parts.length ? parts : null;
+    }
+
+    const systemMessage = messages
+      .filter(m => m?.role === 'system')
+      .map(m => ({ role: 'system', content: sanitizeContent(m.content) }))
+      .filter(m => m.content !== null)
+      .slice(-1);
+
+    const conversation = messages
+      .filter(m => m && ['user', 'assistant'].includes(m.role))
+      .map(m => ({ role: m.role, content: sanitizeContent(m.content) }))
+      .filter(m => m.content !== null)
       .slice(-40);
 
-    const response = await fetch(
-      'https://anymodel.org/v1/chat/completions',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${key}`,
-          'Content-Type': 'application/json',
-          'Accept': 'text/event-stream'
-        },
-        body: JSON.stringify({
-          model: models[mode],
-          messages: safeMessages,
-          stream: true
-        })
-      }
-    );
+    const safeMessages = [...systemMessage, ...conversation];
+    if (!conversation.length) {
+      return res.status(400).json({ error: 'Нет корректных сообщений пользователя' });
+    }
+
+    const response = await fetch('https://anymodel.org/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream'
+      },
+      body: JSON.stringify({
+        model: models[mode],
+        messages: safeMessages,
+        stream: true
+      })
+    });
 
     if (!response.ok) {
       const error = await response.text();
-
       console.error('API ERROR:', response.status, error);
-
       return res.status(502).json({
         error: `API ${response.status}: ${error.slice(0, 350)}`
       });
@@ -70,10 +109,8 @@ export default async function handler(req, res) {
     }
 
     const type = response.headers.get('content-type') || '';
-
     if (!type.includes('text/event-stream')) {
       const error = await response.text();
-
       return res.status(502).json({
         error: 'Неправильный формат ответа: ' + error.slice(0, 300)
       });
@@ -87,18 +124,14 @@ export default async function handler(req, res) {
       if (res.destroyed) break;
       res.write(chunk);
     }
-
     res.end();
-
   } catch (error) {
     console.error('SERVER ERROR:', error);
-
     if (!res.headersSent) {
       return res.status(500).json({
         error: error.message || 'Ошибка сервера'
       });
     }
-
     res.end();
   }
 }
