@@ -439,7 +439,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
   <div class="title" id="ttl">Venus AI</div>
   <select class="model-select" id="modelSelect" title="Модель Venus AI" aria-label="Выбрать модель">
     <option value="cx/gpt-6-luna">Flash</option>
-    <option value="cx/gpt-6.1-sol">High</option>
+    <option value="cx/gpt-6-sol">High</option>
     <option id="proModelOption" value="cx/gpt-6-astra" hidden>Pro High — ASTRO</option>
   </select>
   <div class="top-right">
@@ -646,7 +646,7 @@ const DEFAULT_SYS = `Ты Venus AI — сильный и практичный И
 
 const MODELS = {
   flash: "cx/gpt-6-luna",
-  high: "cx/gpt-6.1-sol",
+  high: "cx/gpt-6-sol",
   pro: "cx/gpt-6-astra"
 };
 
@@ -1736,9 +1736,9 @@ function retryMessage(index) {
  * 30,000 is also passed to the backend as max_tokens per request. */
 const MAX_TOKENS_PER_REQUEST = 30000;
 const MAX_TOTAL_CODE_TOKENS = 30000;
-const MAX_CODE_CONTINUATIONS = 12;
-const STANDARD_CODE_REQUEST_TOKENS = 8192;
-const BACKUP_CODE_REQUEST_TOKENS = 4096;
+const MAX_CODE_CONTINUATIONS = 16;
+const STANDARD_CODE_REQUEST_TOKENS = 3072;
+const BACKUP_CODE_REQUEST_TOKENS = 1536;
 
 function estimateOutputTokens(text) {
   // Approximation for mixed programming text; the provider's tokenizer wins.
@@ -1925,14 +1925,22 @@ async function requestVisibleCode(messages,model,headers,signal,tokenBudget,upda
   const attempts=[
     Math.min(STANDARD_CODE_REQUEST_TOKENS,tokenBudget),
     Math.min(BACKUP_CODE_REQUEST_TOKENS,tokenBudget),
-    Math.min(2048,tokenBudget)
+    Math.min(1024,tokenBudget)
   ].filter((n,i,arr)=>n>0&&arr.indexOf(n)===i);
+  let lastError=null;
   for(let i=0;i<attempts.length;i++) {
     if(signal.aborted) throw new DOMException("Отменено","AbortError");
-    if(i>0) update?.(`Модель не прислала текст. Повторяю с лимитом ${attempts[i]} токенов.`);
-    const response=await requestVenusOnce(messages,model,headers,signal,attempts[i]);
-    if(response.text.trim()) return response;
+    if(i>0) update?.(`Повторяю запрос меньшей частью: ${attempts[i]} токенов.`);
+    try {
+      const response=await requestVenusOnce(messages,model,headers,signal,attempts[i]);
+      if(response.text.trim()) return response;
+    } catch(error) {
+      if(signal.aborted || ![429,502,503,504].includes(error.status)) throw error;
+      lastError=error;
+      console.warn("Venus AI: retrying slow provider",error.status);
+    }
   }
+  if(lastError) throw lastError;
   return {text:"",reason:"empty",empty:true};
 }
 
@@ -2068,7 +2076,7 @@ async function send(text,attachmentsOverride=null) {
       const abortAttempt=()=>attemptController.abort();
       ctrl.signal.addEventListener("abort",abortAttempt,{once:true});
       if(ctrl.signal.aborted) abortAttempt();
-      const r=await fetch(API_URL,{
+      let r=await fetch(API_URL,{
         method:"POST",
         signal:attemptController.signal,
         headers:requestHeaders,
@@ -2080,10 +2088,24 @@ async function send(text,attachmentsOverride=null) {
         })
       });
       if(!r.ok) {
-        ctrl.signal.removeEventListener("abort",abortAttempt);
+        const status=r.status;
         let t="";
         try { t=await r.text(); } catch(e) {}
-        throw new Error("Ошибка "+r.status+(t?": "+t.slice(0,500):""));
+        if(codeBuild && [429,502,503,504].includes(status)) {
+          progress(1,"Сервер отвечает медленно. Пробую создать меньшую часть файла.");
+          const fallback=await requestVisibleCode(
+            conversation,selectedModel,requestHeaders,ctrl.signal,
+            Math.min(BACKUP_CODE_REQUEST_TOKENS,remainingTokens),
+            detail=>progress(1,detail)
+          );
+          if(!fallback.text.trim()) throw new Error("Модель пока не ответила. Полученный код сохранён.");
+          r=new Response(JSON.stringify({
+            choices:[{message:{content:fallback.text},finish_reason:fallback.reason||"stop"}]
+          }),{status:200,headers:{"Content-Type":"application/json"}});
+        } else {
+          ctrl.signal.removeEventListener("abort",abortAttempt);
+          throw new Error("Ошибка "+status+(t?": "+t.slice(0,500):""));
+        }
       }
       const existing=am.content;
       let currentPart="";
