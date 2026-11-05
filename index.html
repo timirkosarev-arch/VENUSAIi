@@ -302,6 +302,16 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
   .artifact-codebar{padding:7px 13px}
 }
 
+
+/* Show the true state of streamed / unfinished code, rather than silently treating it as complete. */
+.artifact-warning{font-size:12px;line-height:1.5;padding:10px 16px;color:#a45d13;background:#fff4dc;border-bottom:1px solid #f3d49c}
+:root[data-theme="dark"] .artifact-warning{background:#3d311b;color:#ffe1a5;border-color:#64502d}
+.artifact-incomplete .artifact-tile{border-color:#cf9e58}
+.artifact-incomplete .artifact-info small{color:#ac741e}
+:root[data-theme="dark"] .artifact-incomplete .artifact-info small{color:#f0c17b}
+.response-incomplete{font-size:12px;line-height:1.5;color:#a45d13;margin:10px 0;border:1px solid #e4c28d;border-radius:9px;padding:8px 10px}
+:root[data-theme="dark"] .response-incomplete{color:#f0c17b;border-color:#644c2b}
+
 </style>
 </head>
 
@@ -521,6 +531,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
       <button class="artifact-close" id="artifactClose" type="button" title="Закрыть" aria-label="Закрыть">×</button>
     </header>
     <div class="artifact-codebar"><strong id="artifactLanguage">Код</strong><span id="artifactStats">0 строк</span></div>
+    <div class="artifact-warning" id="artifactWarning" hidden>Этот код не завершён. Проверьте его перед запуском. Если генерация оборвалась, попросите Venus AI продолжить ответ.</div>
     <div class="artifact-codearea"><pre><code id="artifactCode"></code></pre></div>
     <footer class="artifact-dialog-footer"><span>Код можно копировать и сохранять в файл</span><span id="artifactFilename">code.txt</span></footer>
   </section>
@@ -1074,16 +1085,42 @@ const esc = s => String(s).replace(/[&<>"']/g,c => ({
   "'":"&#39;"
 }[c]));
 
+/** Parse Markdown fenced code line-by-line. Backticks inside strings do not close the artifact.
+ * The previous non-anchored regex cut code off at the first three backticks anywhere. */
+function splitCodeArtifacts(source) {
+  const lines=String(source||"").replace(/\r\n?/g,"\n").split("\n");
+  const blocks=[];
+  const result=[];
+  for(let i=0;i<lines.length;i++) {
+    const opener=lines[i].match(/^ {0,3}(`{3,}|~{3,})([^`~]*)$/);
+    if(!opener) { result.push(lines[i]);continue; }
+    const mark=opener[1][0];
+    const count=opener[1].length;
+    const content=[];
+    let complete=false;
+    for(i=i+1;i<lines.length;i++) {
+      const close=lines[i].match(/^ {0,3}(`+|~+)\s*$/);
+      if(close&&close[1][0]===mark&&close[1].length>=count) {
+        complete=true;
+        break;
+      }
+      content.push(lines[i]);
+    }
+    blocks.push({l:opener[2].trim(),c:content.join("\n"),complete});
+    result.push("\u0000"+(blocks.length-1)+"\u0000");
+    if(!complete) break;
+  }
+  return {text:result.join("\n"),blocks};
+}
+
+function hasUnclosedCodeFence(source) {
+  return splitCodeArtifacts(source).blocks.some(b=>!b.complete);
+}
+
 function md(t) {
-
-  const blocks = [];
-
-  t = t.replace(/```([^\r\n`]*)\r?\n([\s\S]*?)(```|$)/g,(m,l,c) => {
-    blocks.push({l,c});
-    return "\u0000" + (blocks.length-1) + "\u0000";
-  });
-
-  t = esc(t);
+  const parsed=splitCodeArtifacts(t);
+  const blocks=parsed.blocks;
+  t=esc(parsed.text);
 
   const lines = t.split("\n");
 
@@ -1166,14 +1203,14 @@ function md(t) {
       : language==="json" ? "data.json"
       : language==="sql" ? "query.sql"
       : `venus-code.${fileType}`;
-    const code=block.c.replace(/\n$/,"");
+    const code=block.c; // retain every character and trailing newline
     const lines=code ? code.split("\n").length : 0;
     const sample=(code.split("\n").find(line=>line.trim())||"Нажмите, чтобы открыть код").trim().slice(0,72);
     return `
-      <div class="artifact-card" data-artifact-lang="${esc(language)}" data-artifact-filename="${esc(fileName)}">
+      <div class="artifact-card ${block.complete?"":"artifact-incomplete"}" data-artifact-complete="${block.complete}" data-artifact-lang="${esc(language)}" data-artifact-filename="${esc(fileName)}">
         <button class="artifact-tile" type="button" data-open-artifact aria-label="Открыть артефакт ${esc(fileName)}">
           <span class="artifact-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9l-6-6H8Z"/><path d="M14 3v6h7M9 13l-3 3 3 3m6-6 3 3-3 3"/></svg></span>
-          <span class="artifact-info"><strong>${esc(fileName)}</strong><small>${esc(language.toUpperCase())} · ${lines} строк · ${esc(sample)}</small></span>
+          <span class="artifact-info"><strong>${esc(fileName)}</strong><small>${esc(language.toUpperCase())} · ${lines} строк · ${block.complete?esc(sample):"Не завершён"}</small></span>
           <span class="artifact-arrow" aria-hidden="true">↗</span>
         </button>
         <pre class="artifact-source" hidden><code>${esc(code)}</code></pre>
@@ -1283,13 +1320,10 @@ function msgHTML(m,index) {
         ).join("")}
       </div>` : "";
     return `
-  <div class="row u">
-    <div class="bub">
-      ${esc(m.content || "Прикреплённые файлы")}
-      ${attachmentHtml}
-    </div>
-  </div>
-`;
+      <div class="row u">
+        <div class="bub">${esc(m.content || "Прикреплённые файлы")}${attachmentHtml}</div>
+      </div>
+    `;
   }
 
   return `
@@ -1297,6 +1331,7 @@ function msgHTML(m,index) {
       <div class="av"></div>
       <div class="bub">
         ${md(m.content || "")}
+        ${m.truncated ? '<div class="response-incomplete">Ответ мог быть обрезан из-за лимита модели. Проверьте артефакт; можно попросить ИИ продолжить код.</div>' : ''}
         <div class="message-actions">
           <button data-copy-answer data-index="${index}">Копировать</button>
           <button data-share-answer data-index="${index}">Поделиться</button>
@@ -1614,6 +1649,94 @@ function retryMessage(index) {
   send(previous.content||"",previous.attachments||[]);
 }
 
+/* Streaming decoder and response continuation.
+ * Handles SSE chunks split across any network boundaries, including the final event
+ * without a trailing blank line. Prevents silently dropping last code lines. */
+async function readVenusResponse(response,onText) {
+  const contentType=response.headers.get("content-type")||"";
+  if(!contentType.includes("event-stream") || !response.body) {
+    const raw=await response.text();
+    let json;
+    try { json=JSON.parse(raw); }
+    catch { throw new Error("Сервер вернул неизвестный формат: "+raw.slice(0,160)); }
+    if(json.error) throw new Error(json.error.message||json.error||"Ошибка модели");
+    const choice=json.choices?.[0]||{};
+    const content=choice.message?.content||"";
+    onText(typeof content==="string"?content:
+      Array.isArray(content)?content.map(x=>x.text||"").join(""):String(content));
+    return {finishReason:choice.finish_reason||null,interrupted:false};
+  }
+  const reader=response.body.getReader();
+  const decoder=new TextDecoder();
+  let buffer="",reason=null,receivedDone=false,readAny=false;
+  function consumeFrame(frame) {
+    const payload=frame.split("\n").filter(x=>x.startsWith("data:")).map(x=>x.slice(5).trimStart()).join("\n").trim();
+    if(!payload) return;
+    readAny=true;
+    if(payload==="[DONE]") { receivedDone=true;return; }
+    let parsed;
+    try { parsed=JSON.parse(payload); }
+    catch { throw new Error("Повреждённый фрагмент потокового ответа ИИ"); }
+    if(parsed.error) throw new Error(parsed.error.message||"Ошибка модели");
+    const choice=parsed.choices?.[0]||{};
+    if(choice.finish_reason) reason=choice.finish_reason;
+    if(reason==="error" || reason==="content_filter") throw new Error("Модель остановила генерацию кода");
+    let piece=choice.delta?.content||choice.message?.content||"";
+    if(Array.isArray(piece)) piece=piece.map(x=>x.text||"").join("");
+    if(typeof piece==="string") onText(piece);
+  }
+  try {
+    while(true) {
+      const {done,value}=await reader.read();
+      if(done) break;
+      buffer+=decoder.decode(value,{stream:true});
+      buffer=buffer.replace(/\r\n/g,"\n");
+      let boundary;
+      while((boundary=buffer.indexOf("\n\n"))!==-1) {
+        consumeFrame(buffer.slice(0,boundary));
+        buffer=buffer.slice(boundary+2);
+      }
+    }
+    buffer+=decoder.decode();
+    if(buffer.trim()) {
+      // Some SSE endpoints omit a final blank line; also handle single-newline events.
+      const pending=buffer.replace(/\r\n/g,"\n");
+      if(pending.includes("\n\n")) {
+        pending.split("\n\n").forEach(consumeFrame);
+      } else {
+        pending.split("\n").filter(Boolean).forEach(consumeFrame);
+      }
+    }
+  } finally { try {reader.releaseLock();}catch {} }
+  return {finishReason:reason,interrupted:readAny && !receivedDone && reason==null};
+}
+
+function mergeCodeContinuation(previous,continued) {
+  let part=continued;
+  if(hasUnclosedCodeFence(previous)) {
+    // A model sometimes starts a new fenced block despite the instruction.
+    part=part.replace(/^(?:\s*```[^\n]*\n)/,"");
+    part=part.replace(/^(?:Продолжение(?: кода)?[:：]?\s*\n)/i,"");
+  }
+  // Some models restart from the beginning despite a continuation prompt.
+  // If the new fragment contains a full replacement, prefer it to duplicating the file.
+  const blocks=splitCodeArtifacts(previous).blocks;
+  const unfinished=blocks.length && !blocks[blocks.length-1].complete ? blocks[blocks.length-1] : null;
+  if(unfinished && unfinished.c.length>=120 && part.length>unfinished.c.length) {
+    const prefix=unfinished.c.slice(0,Math.min(100,unfinished.c.length));
+    if(part.startsWith(prefix)) {
+      const offset=previous.lastIndexOf(unfinished.c);
+      if(offset>=0) return previous.slice(0,offset)+part;
+    }
+  }
+  const max=Math.min(1500,previous.length,part.length);
+  let overlap=0;
+  for(let n=max;n>0;n--) {
+    if(previous.endsWith(part.slice(0,n))) {overlap=n;break;}
+  }
+  return previous+part.slice(overlap);
+}
+
 /* SEND */
 
 async function send(text,attachmentsOverride=null) {
@@ -1678,63 +1801,67 @@ async function send(text,attachmentsOverride=null) {
       requestHeaders.Authorization = `Bearer ${await auth.currentUser.getIdToken()}`;
     }
 
-    const r=await fetch(API_URL,{
-      method:"POST",
-      signal:ctrl.signal,
-      headers:requestHeaders,
-      body:JSON.stringify({
-        model:selectedModel,
-        messages,
-        stream:true,
-        max_tokens:8192
-      })
-    });
-
-    if(!r.ok) {
-      let t="";
-      try { t=await r.text(); } catch(e) {}
-      throw new Error("Ошибка "+r.status+(t?": "+t.slice(0,500):""));
-    }
-
-    const ct=r.headers.get("content-type")||"";
-    if(ct.includes("event-stream")&&r.body) {
-      const rd=r.body.getReader();
-      const dec=new TextDecoder();
-      let buf="";
-      while(true) {
-        const {done,value}=await rd.read();
-        if(done)break;
-        buf+=dec.decode(value,{stream:true});
-        const parts=buf.split("\n");
-        buf=parts.pop();
-        for(const p of parts) {
-          const line=p.trim();
-          if(!line.startsWith("data:"))continue;
-          const data=line.slice(5).trim();
-          if(data==="[DONE]")continue;
-          let j;
-          try { j=JSON.parse(data); } catch(e) { continue; }
-          if (j.error || j.choices?.[0]?.finish_reason === "error") {
-            const detail=j.error?.message||j.error?.metadata?.error_type||"Модели временно недоступны";
-            throw new Error(detail);
-          }
-          let piece=j.choices?.[0]?.delta?.content||"";
-          if(Array.isArray(piece)) piece=piece.map(x=>x.text||"").join("");
-          if(typeof piece==="string"&&piece) {
-            am.content+=piece;
-            if(live()) live().innerHTML=md(am.content);
-            $("msgs").scrollTop=$("msgs").scrollHeight;
-          }
-        }
+    // The API can stop at the generation limit even if HTTP status is 200.
+    // Resume at most twice. Never mark an unfinished artifact as complete.
+    let conversation=messages;
+    let outputReason=null;
+    let interrupted=false;
+    let continued=0;
+    for(let round=0;round<3;round++) {
+      const r=await fetch(API_URL,{
+        method:"POST",
+        signal:ctrl.signal,
+        headers:requestHeaders,
+        body:JSON.stringify({
+          model:selectedModel,
+          messages:conversation,
+          stream:true,
+          max_tokens:8192
+        })
+      });
+      if(!r.ok) {
+        let t="";
+        try { t=await r.text(); } catch(e) {}
+        throw new Error("Ошибка "+r.status+(t?": "+t.slice(0,500):""));
       }
-    } else {
-      const j=await r.json();
-      if (j.error) throw new Error(j.error.message||"Модели временно недоступны");
-      const result=j.choices?.[0]?.message?.content||"";
-      am.content=typeof result==="string"?result:
-        Array.isArray(result)?result.map(x=>x.text||"").join(""):String(result);
-      if(live())live().innerHTML=md(am.content);
+      const existing=am.content;
+      let currentPart="";
+      let lastPaint=0;
+      const paint=()=>{
+        const el=live();
+        if(el) el.innerHTML=md(am.content);
+        $("msgs").scrollTop=$("msgs").scrollHeight;
+      };
+      const addText=piece=>{
+        if(!piece) return;
+        currentPart+=piece;
+        am.content=round===0 ? existing+currentPart : mergeCodeContinuation(existing,currentPart);
+        // Full Markdown parsing on each token freezes mobile browsers for long files.
+        if(Date.now()-lastPaint>110) { paint();lastPaint=Date.now(); }
+      };
+      const result=await readVenusResponse(r,addText);
+      if(!currentPart) break;
+      outputReason=result.finishReason;
+      interrupted=result.interrupted;
+      continued=round;
+      paint();
+      if(ctrl.signal.aborted) throw new DOMException("Aborted","AbortError");
+      const unfinished=hasUnclosedCodeFence(am.content);
+      const limitHit=outputReason==="length";
+      if(!limitHit && !unfinished && !interrupted) break;
+      if(round===2) break;
+      // Build context for the next round without resending partial code as an unrelated prompt.
+      const prompt=unfinished
+        ? "Продолжи НЕЗАВЕРШЁННЫЙ блок исходного кода строго с последнего символа. " +
+          "Не повторяй написанные строки, не начинай файл заново, не открывай новый блок ``` и не объясняй. " +
+          "Верни только оставшуюся часть кода, затем на отдельной строке закрой блок тройными обратными кавычками. " +
+          "Убедись, что все теги, функции и скобки исходного файла закрыты."
+        : "Продолжи предыдущий ответ с последнего символа, не повторяя уже выведенный текст. " +
+          "Доведи решение до конца и не сокращай исходный код.";
+      conversation=[...messages,{role:"assistant",content:am.content},{role:"user",content:prompt}];
     }
+    am.truncated = outputReason==="length" || interrupted || hasUnclosedCodeFence(am.content);
+    if(am.truncated) console.warn("Venus AI: model reply may be incomplete",{outputReason,interrupted,continued});
 
     if(am.content) c.messages.push(am);
     if(!am.content && live()) live().innerHTML="<span>Модель не вернула ответ.</span>";
@@ -1744,10 +1871,17 @@ async function send(text,attachmentsOverride=null) {
       if(am.content)c.messages.push(am);
       else if($("live"))$("live").remove();
     } else {
+      if(am.content) {
+        am.truncated=true;
+        if(!c.messages.includes(am)) c.messages.push(am);
+        saveChats();
+      }
       const hint=e.message==="Failed to fetch"
         ? "Не удалось подключиться к серверу. Проверьте API и интернет."
         : e.message;
-      if(live())live().innerHTML=`<div class="err">${esc(hint)}</div>`;
+      if(live())live().innerHTML=am.content
+        ? md(am.content)+`<div class="err">Ответ прерван: ${esc(hint)}. Полученный код сохранён, но может быть неполным.</div>`
+        : `<div class="err">${esc(hint)}</div>`;
     }
   }
 
@@ -2069,14 +2203,16 @@ function openArtifact(card) {
   const code=raw.textContent||"";
   const language=card.dataset.artifactLang||"text";
   const filename=card.dataset.artifactFilename||`venus-code.${extensionForLanguage(language)}`;
-  openedArtifact={code,language,filename};
+  const complete=card.dataset.artifactComplete!=="false";
+  openedArtifact={code,language,filename,complete};
+  $("artifactWarning").hidden=complete;
   artifactReturnFocus=document.activeElement;
   $("artifactCode").textContent=code;
   $("artifactTitle").textContent=filename;
   $("artifactFilename").textContent=filename;
   $("artifactLanguage").textContent=language.toUpperCase();
   const lines=code ? code.split("\n").length : 0;
-  $("artifactStats").textContent=`${lines} строк · ${formatBytes(new Blob([code]).size)}`;
+  $("artifactStats").textContent=`${lines} строк · ${formatBytes(new Blob([code]).size)}${complete?"":" · НЕ ЗАВЕРШЁН"}`;
   $("artifactCopyLabel").textContent="Копировать";
   $("artifactModal").classList.add("on");
   $("artifactModal").setAttribute("aria-hidden","false");
