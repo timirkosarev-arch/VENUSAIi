@@ -4,10 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#ffffff">
+<meta property="og:title" content="Venus AI">
+<meta property="og:image" content="https://i.ibb.co.com/PzWLhSZL/AI-png.jpg">
 <script>try{document.documentElement.dataset.theme=localStorage.getItem("venus_theme_v2")||"light"}catch(e){document.documentElement.dataset.theme="light"}</script>
 <title>Venus AI</title>
 
-<link rel="icon" href="https://i.ibb.co.com/wryLQv5P/photo-2026-11-03-00-49-56.jpg">
+<link rel="icon" href="https://i.ibb.co.com/PzWLhSZL/AI-png.jpg">
 
 <style>
 /* Venus AI — Studio UI 2026. All existing application IDs are preserved. */
@@ -18,7 +20,7 @@
   --accent2:#6954b7; --user:#f3f3f1; --card:#fff; --hover:#efefed;
   --soft:#f6f6f4; --shadow:0 12px 50px rgba(30,30,30,.055);
   --danger:#b23b58; --overlay:rgba(20,20,20,.42);
-  --ava:url('https://i.ibb.co.com/wryLQv5P/photo-2026-11-03-00-49-56.jpg');
+  --ava:url('https://i.ibb.co.com/PzWLhSZL/AI-png.jpg');
 }
 :root[data-theme="dark"] {
   color-scheme:dark;
@@ -37,8 +39,8 @@ button{cursor:pointer;color:inherit;touch-action:manipulation}
 button:disabled{cursor:default;opacity:.45}
 a{color:inherit}
 button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,a:focus-visible {outline:2px solid var(--accent);outline-offset:3px}
-.logo,.av {background:linear-gradient(145deg,#26272b,#4b445b);display:grid;place-items:center;flex-shrink:0;color:#fff}
-.logo::before,.av::before{content:"✦";font-size:17px;line-height:1}
+.logo,.av {background:var(--ava) center/cover no-repeat;display:grid;place-items:center;flex-shrink:0;color:#fff;border:1px solid rgba(132,91,182,.16)}
+.logo::before,.av::before{content:none}
 .logo{width:33px;height:33px;border-radius:12px}
 .av{width:30px;height:30px;border-radius:11px;margin-top:2px}
 .av::before{font-size:14px}
@@ -69,8 +71,8 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .admin-open{margin:8px 0 3px;border:1px solid var(--line);font-size:13px}
 .register-guest{justify-content:center;border:1px solid var(--line);margin:7px 0}
 .account{display:flex;align-items:center;gap:10px;padding:14px 7px 2px;border-top:1px solid var(--line);margin-top:10px;min-width:0}
-.account-avatar{height:34px;width:34px;border-radius:50%;flex-shrink:0;background:#dad8f4;color:#4b428c;display:grid;place-items:center;font-size:14px;font-weight:750}
-.account-avatar::before{content:"V"}
+.account-avatar{height:34px;width:34px;border-radius:50%;flex-shrink:0;background:var(--ava) center/cover no-repeat;display:grid;place-items:center;font-size:14px;font-weight:750}
+.account-avatar::before{content:none}
 .account-info{flex:1;min-width:0}
 .account-info div{font-size:12.5px;font-weight:630;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .account-info small{display:block;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -253,6 +255,52 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 }
 @media(max-width:365px){.title{display:none}.sugs{grid-template-columns:1fr}.sugs button{min-height:58px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+
+
+/* Click-to-open code artifacts */
+.artifact-card{margin:13px 0 17px;max-width:100%;width:min(100%,620px)}
+.artifact-tile{width:100%;border:1px solid var(--line);background:var(--card);border-radius:16px;padding:15px 16px;text-align:left;color:var(--text);display:flex;align-items:center;gap:14px;box-shadow:0 3px 12px rgba(0,0,0,.025);transition:transform .16s,box-shadow .16s,border-color .16s}
+.artifact-tile:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.artifact-symbol{width:43px;height:43px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,#f2ebff,#e4d8ff);color:#6749ad;flex-shrink:0}
+:root[data-theme="dark"] .artifact-symbol{background:#362b45;color:#ddc9ff}
+.artifact-symbol svg{width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.artifact-info{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.artifact-info strong{font-size:13.5px;font-weight:700;line-height:1.4;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.artifact-info small{font-size:11px;color:var(--muted);line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.artifact-arrow{font-size:20px;color:var(--muted);padding:0 3px;transition:transform .16s}
+.artifact-tile:hover .artifact-arrow{transform:translateX(3px);color:var(--accent)}
+.artifact-modal{z-index:85;padding:clamp(8px,2vw,22px)}
+.artifact-dialog{width:min(1100px,100%);height:min(88dvh,850px);background:var(--bg);color:var(--text);border-radius:20px;border:1px solid var(--line);box-shadow:0 24px 95px rgba(0,0,0,.25);display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.artifact-dialog-header{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line);flex-shrink:0}
+.artifact-dialog-avatar{width:35px;height:35px;border-radius:10px;background:var(--ava) center/cover no-repeat;flex-shrink:0}
+.artifact-dialog-heading{display:flex;flex-direction:column;gap:0;min-width:0;flex:1}
+.artifact-dialog-heading strong{font-size:14px;font-weight:725;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.artifact-dialog-heading small{font-size:11px;color:var(--muted)}
+.artifact-icon-btn{border:1px solid var(--line);background:var(--panel);border-radius:10px;min-height:37px;padding:6px 11px;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-size:12px;font-weight:650;transition:background .15s,border-color .15s}
+.artifact-icon-btn:hover{background:var(--hover);border-color:var(--accent)}
+.artifact-icon-btn img{width:17px;height:17px;object-fit:contain;flex-shrink:0}
+:root[data-theme="dark"] .artifact-icon-btn img{filter:invert(1)}
+.artifact-close{width:37px;height:37px;display:grid;place-items:center;border:0;border-radius:10px;background:transparent;font-size:24px;line-height:1;color:var(--muted)}
+.artifact-close:hover{background:var(--hover);color:var(--text)}
+.artifact-codebar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 18px;background:var(--panel2);border-bottom:1px solid var(--line);font-size:11px;color:var(--muted)}
+.artifact-codebar strong{font-weight:700;color:var(--text)}
+.artifact-codebar span{font-variant-numeric:tabular-nums}
+.artifact-codearea{flex:1;min-height:0;overflow:auto;background:var(--soft)}
+.artifact-codearea pre{margin:0;padding:24px 24px 34px;min-width:max-content;tab-size:2;font:13px/1.75 ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;white-space:pre;color:var(--text)}
+.artifact-codearea code{font:inherit}
+.artifact-dialog-footer{flex-shrink:0;border-top:1px solid var(--line);padding:10px 18px;background:var(--panel);display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--muted);font-size:11px}
+.artifact-commands{display:flex;align-items:center;gap:8px}
+@media(max-width:680px){
+  .artifact-modal{padding:0}
+  .artifact-dialog{height:100dvh;width:100%;border-radius:0;border:0}
+  .artifact-dialog-header{padding:12px 12px;gap:8px}
+  .artifact-dialog-avatar{width:31px;height:31px}
+  .artifact-codearea pre{padding:16px 14px 24px;font-size:12px;line-height:1.65}
+  .artifact-icon-btn{min-height:35px;padding:6px 8px;gap:5px;font-size:11px}
+  .artifact-icon-btn img{width:15px;height:15px}
+  .artifact-dialog-footer{padding:10px 12px}
+  .artifact-codebar{padding:7px 13px}
+}
 
 </style>
 </head>
@@ -456,6 +504,26 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
       <button class="btn" id="closeAdminBtn" type="button">Закрыть</button>
     </div>
   </div>
+</div>
+
+
+<!-- ARTIFACT CODE VIEWER -->
+<div class="mod artifact-modal" id="artifactModal" role="dialog" aria-modal="true" aria-labelledby="artifactTitle" aria-hidden="true">
+  <section class="artifact-dialog" aria-label="Просмотр кода артефакта">
+    <header class="artifact-dialog-header">
+      <div class="artifact-dialog-avatar" aria-hidden="true"></div>
+      <div class="artifact-dialog-heading">
+        <strong id="artifactTitle">Код артефакта</strong>
+        <small>Venus AI · Артефакт</small>
+      </div>
+      <button class="artifact-icon-btn" id="artifactCopy" type="button" title="Копировать код" aria-label="Копировать код"><img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQweRuCM4SuAbWZAy2HfqbnoCDDpvggKy1-PK7zdaGr3g&amp;s=10" alt=""><span id="artifactCopyLabel">Копировать</span></button>
+      <button class="artifact-icon-btn" id="artifactDownload" type="button" title="Скачать файл" aria-label="Скачать файл"><img src="https://cdn-icons-png.flaticon.com/512/54/54993.png" alt=""><span>Скачать</span></button>
+      <button class="artifact-close" id="artifactClose" type="button" title="Закрыть" aria-label="Закрыть">×</button>
+    </header>
+    <div class="artifact-codebar"><strong id="artifactLanguage">Код</strong><span id="artifactStats">0 строк</span></div>
+    <div class="artifact-codearea"><pre><code id="artifactCode"></code></pre></div>
+    <footer class="artifact-dialog-footer"><span>Код можно копировать и сохранять в файл</span><span id="artifactFilename">code.txt</span></footer>
+  </section>
 </div>
 
 <!-- FIREBASE + APP -->
@@ -1010,7 +1078,7 @@ function md(t) {
 
   const blocks = [];
 
-  t = t.replace(/```(\w*)\n?([\s\S]*?)(```|$)/g,(m,l,c) => {
+  t = t.replace(/```([^\r\n`]*)\r?\n([\s\S]*?)(```|$)/g,(m,l,c) => {
     blocks.push({l,c});
     return "\u0000" + (blocks.length-1) + "\u0000";
   });
@@ -1086,22 +1154,30 @@ function md(t) {
   close();
 
   return out.replace(/\u0000(\d+)\u0000/g,(m,i) => {
-
-    const b=blocks[+i];
-
+    const block=blocks[+i];
+    const rawLanguage=String(block.l||"").trim().toLowerCase().split(/\s+/)[0];
+    const language=rawLanguage||"text";
+    const fileType=extensionForLanguage(language);
+    const fileName=language==="html" ? "index.html"
+      : language==="css" ? "style.css"
+      : language==="javascript"||language==="js" ? "script.js"
+      : language==="typescript"||language==="ts" ? "index.ts"
+      : language==="python"||language==="py" ? "main.py"
+      : language==="json" ? "data.json"
+      : language==="sql" ? "query.sql"
+      : `venus-code.${fileType}`;
+    const code=block.c.replace(/\n$/,"");
+    const lines=code ? code.split("\n").length : 0;
+    const sample=(code.split("\n").find(line=>line.trim())||"Нажмите, чтобы открыть код").trim().slice(0,72);
     return `
-      <div class="pre">
-        <div class="h">
-          <span>${esc(b.l || "код")}</span>
-          <div class="code-actions">
-            <button data-copy>Копировать</button>
-            <button data-download-code data-lang="${esc((b.l || "txt").toLowerCase())}">Скачать файл</button>
-          </div>
-        </div>
-        <pre><code>${esc(b.c.replace(/\n$/,""))}</code></pre>
-      </div>
-    `;
-
+      <div class="artifact-card" data-artifact-lang="${esc(language)}" data-artifact-filename="${esc(fileName)}">
+        <button class="artifact-tile" type="button" data-open-artifact aria-label="Открыть артефакт ${esc(fileName)}">
+          <span class="artifact-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9l-6-6H8Z"/><path d="M14 3v6h7M9 13l-3 3 3 3m6-6 3 3-3 3"/></svg></span>
+          <span class="artifact-info"><strong>${esc(fileName)}</strong><small>${esc(language.toUpperCase())} · ${lines} строк · ${esc(sample)}</small></span>
+          <span class="artifact-arrow" aria-hidden="true">↗</span>
+        </button>
+        <pre class="artifact-source" hidden><code>${esc(code)}</code></pre>
+      </div>`;
   });
 
 }
@@ -1521,7 +1597,7 @@ function extensionForLanguage(lang) {
   const map={javascript:"js",js:"js",typescript:"ts",ts:"ts",tsx:"tsx",jsx:"jsx",
     python:"py",py:"py",html:"html",css:"css",json:"json",xml:"xml",yaml:"yml",
     yml:"yml",markdown:"md",md:"md",sql:"sql",bash:"sh",sh:"sh",lua:"lua",
-    java:"java",c:"c",cpp:"cpp",csharp:"cs",cs:"cs",go:"go",rust:"rs",rs:"rs",
+    java:"java",c:"c",cpp:"cpp","c++":"cpp",csharp:"cs","c#":"cs",cs:"cs",go:"go",rust:"rs",rs:"rs",
     php:"php",ruby:"rb",rb:"rb",swift:"swift",kotlin:"kt",text:"txt",txt:"txt"};
   return map[lang]||"txt";
 }
@@ -1983,12 +2059,83 @@ $("burger").onclick=()=>{
 
 $("back").onclick=closeSide;
 
+/* ARTIFACT VIEWER */
+let openedArtifact=null;
+let artifactReturnFocus=null;
+
+function openArtifact(card) {
+  const raw=card.querySelector(".artifact-source code");
+  if(!raw) return;
+  const code=raw.textContent||"";
+  const language=card.dataset.artifactLang||"text";
+  const filename=card.dataset.artifactFilename||`venus-code.${extensionForLanguage(language)}`;
+  openedArtifact={code,language,filename};
+  artifactReturnFocus=document.activeElement;
+  $("artifactCode").textContent=code;
+  $("artifactTitle").textContent=filename;
+  $("artifactFilename").textContent=filename;
+  $("artifactLanguage").textContent=language.toUpperCase();
+  const lines=code ? code.split("\n").length : 0;
+  $("artifactStats").textContent=`${lines} строк · ${formatBytes(new Blob([code]).size)}`;
+  $("artifactCopyLabel").textContent="Копировать";
+  $("artifactModal").classList.add("on");
+  $("artifactModal").setAttribute("aria-hidden","false");
+  $("artifactClose").focus();
+}
+
+function closeArtifact() {
+  $("artifactModal").classList.remove("on");
+  $("artifactModal").setAttribute("aria-hidden","true");
+  openedArtifact=null;
+  artifactReturnFocus?.focus?.();
+  artifactReturnFocus=null;
+}
+
+$("artifactClose").onclick=closeArtifact;
+$("artifactModal").addEventListener("click",e=>{
+  if(e.target===$("artifactModal")) closeArtifact();
+});
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape" && $("artifactModal").classList.contains("on")) {
+    e.preventDefault();
+    closeArtifact();
+  }
+});
+
+$("artifactCopy").onclick=async()=>{
+  if(!openedArtifact) return;
+  try {
+    await navigator.clipboard.writeText(openedArtifact.code);
+    $("artifactCopyLabel").textContent="Скопировано";
+    setTimeout(()=>{if($("artifactCopyLabel")) $("artifactCopyLabel").textContent="Копировать";},1500);
+  } catch(error) {
+    // Clipboard can be unavailable in insecure origins: show selected text.
+    const selection=window.getSelection();
+    const range=document.createRange();
+    range.selectNodeContents($("artifactCode"));
+    selection.removeAllRanges();
+    selection.addRange(range);
+    alert("Выделил код — скопируйте его вручную.");
+  }
+};
+
+$("artifactDownload").onclick=()=>{
+  if(!openedArtifact) return;
+  downloadBlob(openedArtifact.code,openedArtifact.filename,"text/plain;charset=utf-8");
+};
+
 /* MESSAGE ACTIONS, CODE EXPORTS AND SUGGESTIONS */
 
 $("wrap").addEventListener("click",async e=>{
   const suggestion=e.target.closest("[data-s]");
   if(suggestion) {
     send(suggestion.dataset.s);
+    return;
+  }
+
+  const artifactButton=e.target.closest("[data-open-artifact]");
+  if(artifactButton) {
+    openArtifact(artifactButton.closest(".artifact-card"));
     return;
   }
 
