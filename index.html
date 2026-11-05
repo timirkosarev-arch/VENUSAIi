@@ -8,7 +8,7 @@
 <meta property="og:image" content="https://i.ibb.co.com/PzWLhSZL/AI-png.jpg">
 <script>try{document.documentElement.dataset.theme=localStorage.getItem("venus_theme_v2")||"light"}catch(e){document.documentElement.dataset.theme="light"}</script>
 <title>Venus AI</title>
-<meta name="venus-build" content="lines-timeout-2026-11-06">
+<meta name="venus-build" content="opus-5-5-30k-2026-11-06">
 
 <link rel="icon" href="https://i.ibb.co.com/PzWLhSZL/AI-png.jpg">
 
@@ -456,7 +456,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
   <select class="model-select" id="modelSelect" title="Модель Venus AI" aria-label="Выбрать модель">
     <option value="cx/gpt-6-luna">Flash</option>
     <option value="cx/gpt-6-sol">High</option>
-    <option id="proModelOption" value="cx/gpt-6-astra" hidden>Pro High — ASTRO</option>
+    <option id="proModelOption" value="cc/claude-opus-5-5" hidden>Pro High — Claude Opus 5.5</option>
   </select>
   <div class="top-right">
     <button class="top-new" id="topNewBtn" type="button" title="Новый чат" aria-label="Новый чат"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L10 16l-4 1 1-4Z"/><path d="M4 4h7M4 4v16h16v-7"/></svg></button>
@@ -519,7 +519,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 <div class="mod" id="proMod">
   <div class="card pro-card">
     <div class="pro-kicker">VENUS AI PRO</div>
-    <h2>GPT-6 ASTRO</h2>
+    <h2>Claude Opus 5.5</h2>
     <p class="pro-description">Доступ к модели Pro High на 30 дней.</p>
     <div class="pro-price-line">
       <span class="old-price">$20</span>
@@ -663,7 +663,7 @@ const DEFAULT_SYS = `Ты Venus AI — сильный и практичный И
 const MODELS = {
   flash: "cx/gpt-6-luna",
   high: "cx/gpt-6-sol",
-  pro: "cx/gpt-6-astra"
+  pro: "cc/claude-opus-5-5"
 };
 
 const ADMIN_EMAIL = "flexadssq@gmail.com";
@@ -1065,10 +1065,12 @@ onAuthStateChanged(auth,user => {
     : savedSystem;
   if (!savedSystem || savedSystem === LEGACY_DEFAULT_SYS) saveSystem();
 
-  const selectedModel = store.get(modelKey(settingsId),MODELS.flash);
+  const savedModel = store.get(modelKey(settingsId),MODELS.flash);
+  const selectedModel = savedModel === "cx/gpt-6-astra" ? MODELS.pro : savedModel;
   $("modelSelect").value = ALL_MODEL_VALUES.has(selectedModel)
     ? selectedModel
     : MODELS.flash;
+  if (selectedModel !== savedModel) store.set(modelKey(settingsId), selectedModel);
 
   $("accountName").textContent = user
     ? (user.displayName || "Пользователь")
@@ -1751,9 +1753,10 @@ function retryMessage(index) {
 
 /* Output budgets. Token counts here are approximate: exact tokenization
  * depends on AnyModel's underlying model, which is not exposed to the page.
- * 30,000 is also passed to the backend as max_tokens per request. */
+ * 30,000 is the allowed ceiling; normal requests use shorter chunks to avoid timeouts. */
 const MAX_TOKENS_PER_REQUEST = 30000;
 const MAX_TOTAL_CODE_TOKENS = 30000;
+const STANDARD_CHAT_REQUEST_TOKENS = 3072; // Short chunks reduce Vercel 503/504 risk.
 const MAX_CODE_CONTINUATIONS = 40;
 const STANDARD_CODE_REQUEST_TOKENS = 1024;
 const BACKUP_CODE_REQUEST_TOKENS = 512;
@@ -2149,11 +2152,11 @@ async function send(text,attachmentsOverride=null) {
     for(let round=0;round<maxRounds;round++) {
       const remainingTokens=codeBuild
         ? MAX_TOTAL_CODE_TOKENS-estimateOutputTokens(am.content)
-        : MAX_TOKENS_PER_REQUEST;
-      if(codeBuild && remainingTokens<=0) {budgetHit=true;break;}
+        : MAX_TOKENS_PER_REQUEST-estimateOutputTokens(am.content);
+      if(remainingTokens<=0) {budgetHit=true;break;}
       const responseTokenLimit=codeBuild
         ? Math.min(STANDARD_CODE_REQUEST_TOKENS,Math.max(1,remainingTokens))
-        : Math.min(MAX_TOKENS_PER_REQUEST,Math.max(1,remainingTokens));
+        : Math.min(STANDARD_CHAT_REQUEST_TOKENS,Math.max(1,remainingTokens));
       const attemptController=new AbortController();
       const abortAttempt=()=>attemptController.abort();
       ctrl.signal.addEventListener("abort",abortAttempt,{once:true});
