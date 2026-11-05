@@ -1411,7 +1411,7 @@ function msgHTML(m,index) {
         ${m.codeBuild && m.resuming ? '<div class="code-build-result">Дополняю код и проверяю результат…</div>' : ''}
         ${m.truncated && m.codeBuild && !m.resuming ? `<div class="code-build-result">${m.tokenBudgetHit ? "Достигнут предел 30 000 токенов для одного проекта. Можно создать более компактную версию." : "Код сохранён. Можно продолжить генерацию с места остановки."}${m.resumeError ? " " + esc(m.resumeError) : ""}</div>` : ''}
         ${m.truncated && !m.codeBuild ? '<div class="code-build-result">Ответ прервался. Попробуйте повторить запрос.</div>' : ''}
-        ${m.codeBuild && !m.truncated && inspectCodeFiles(m.content).files.length ? '<div class="code-build-result">Файл готов к скачиванию. Откройте артефакт или сохраните файлы напрямую.</div>' : ''}
+        ${m.codeBuild && !m.truncated && inspectCodeFiles(m.content).files.length ? '<div class="code-build-result">Файлы сформированы. Откройте артефакт или скачайте проект. Проверка запуска выполняется отдельно.</div>' : ''}
         <div class="message-actions">
           ${m.codeBuild && m.truncated && !m.resuming ? `<button data-resume-code data-index="${index}" type="button">${m.tokenBudgetHit ? "Сделать компактную версию" : "Продолжить генерацию"}</button>` : ''}
           ${m.codeBuild && !m.truncated && inspectCodeFiles(m.content).files.length ? `<button data-download-project data-index="${index}" type="button">${inspectCodeFiles(m.content).files.length===1?"Скачать файл":"Скачать проект ZIP"}</button>` : ''}
@@ -1736,7 +1736,9 @@ function retryMessage(index) {
  * 30,000 is also passed to the backend as max_tokens per request. */
 const MAX_TOKENS_PER_REQUEST = 30000;
 const MAX_TOTAL_CODE_TOKENS = 30000;
-const MAX_CODE_CONTINUATIONS = 30;
+const MAX_CODE_CONTINUATIONS = 12;
+const STANDARD_CODE_REQUEST_TOKENS = 8192;
+const BACKUP_CODE_REQUEST_TOKENS = 4096;
 
 function estimateOutputTokens(text) {
   // Approximation for mixed programming text; the provider's tokenizer wins.
@@ -1766,45 +1768,71 @@ function fitIntoCodeBudget(currentText, nextText, maxTokens=MAX_TOTAL_CODE_TOKEN
 /* Streaming decoder and response continuation.
  * Handles SSE chunks split across any network boundaries, including the final event
  * without a trailing blank line. Prevents silently dropping last code lines. */
+function visibleVenusText(choice, json={}) {
+  const values=[
+    choice?.delta?.content,
+    choice?.message?.content,
+    choice?.text,
+    json?.output_text,
+    json?.response
+  ];
+  for(const value of values) {
+    if(typeof value==="string" && value) return value;
+    if(Array.isArray(value)) {
+      const output=value.map(part=>typeof part==="string"?part:
+        (typeof part?.text==="string"?part.text:
+        (typeof part?.content==="string"?part.content:""))).join("");
+      if(output) return output;
+    }
+  }
+  return "";
+}
+
 async function readVenusResponse(response,onText) {
-  const contentType=response.headers.get("content-type")||"";
-  if(!contentType.includes("event-stream") || !response.body) {
+  const contentType=(response.headers.get("content-type")||"").toLowerCase();
+  if(!contentType.includes("text/event-stream") || !response.body) {
     const raw=await response.text();
-    let json;
-    try { json=JSON.parse(raw); }
-    catch { throw new Error("Сервер вернул неизвестный формат: "+raw.slice(0,160)); }
-    if(json.error) throw new Error(json.error.message||json.error||"Ошибка модели");
-    const choice=json.choices?.[0]||{};
-    const content=choice.message?.content||"";
-    onText(typeof content==="string"?content:
-      Array.isArray(content)?content.map(x=>x.text||"").join(""):String(content));
-    return {finishReason:choice.finish_reason||null,interrupted:false};
+    let parsed;
+    try { parsed=JSON.parse(raw); }
+    catch { throw new Error("Сервер вернул не JSON: "+raw.slice(0,160)); }
+    if(parsed.error) {
+      const reason=typeof parsed.error==="string"?parsed.error:parsed.error.message;
+      throw new Error(reason||"Ошибка модели");
+    }
+    const choice=parsed.choices?.[0]||{};
+    const text=visibleVenusText(choice,parsed);
+    if(text) onText(text);
+    return {finishReason:choice.finish_reason||null,interrupted:false,empty:!text.trim()};
   }
   const reader=response.body.getReader();
   const decoder=new TextDecoder();
-  let buffer="",reason=null,receivedDone=false,readAny=false;
+  let buffer="",reason=null,receivedDone=false,receivedText=false;
   function consumeFrame(frame) {
-    const payload=frame.split("\n").filter(x=>x.startsWith("data:")).map(x=>x.slice(5).trimStart()).join("\n").trim();
-    if(!payload) return;
-    readAny=true;
-    if(payload==="[DONE]") { receivedDone=true;return; }
+    const data=frame.split("\n")
+      .filter(line=>line.startsWith("data:"))
+      .map(line=>line.slice(5).trimStart()).join("\n").trim();
+    if(!data) return;
+    if(data==="[DONE]") {receivedDone=true;return;}
     let parsed;
-    try { parsed=JSON.parse(payload); }
-    catch { throw new Error("Повреждённый фрагмент потокового ответа ИИ"); }
-    if(parsed.error) throw new Error(parsed.error.message||"Ошибка модели");
+    try {parsed=JSON.parse(data);}
+    catch {return;} // Ignore a broken frame; never lose completed frames.
+    if(parsed.error) {
+      throw new Error(typeof parsed.error==="string"?parsed.error:
+        (parsed.error.message||"Ошибка модели"));
+    }
     const choice=parsed.choices?.[0]||{};
     if(choice.finish_reason) reason=choice.finish_reason;
-    if(reason==="error" || reason==="content_filter") throw new Error("Модель остановила генерацию кода");
-    let piece=choice.delta?.content||choice.message?.content||"";
-    if(Array.isArray(piece)) piece=piece.map(x=>x.text||"").join("");
-    if(typeof piece==="string") onText(piece);
+    if(reason==="error" || reason==="content_filter")
+      throw new Error("Модель завершила ответ с ошибкой");
+    const text=visibleVenusText(choice,parsed);
+    if(text) {receivedText=true;onText(text);}
   }
   try {
     while(true) {
       const {done,value}=await reader.read();
-      if(done) break;
+      if(done)break;
       buffer+=decoder.decode(value,{stream:true});
-      buffer=buffer.replace(/\r\n/g,"\n");
+      buffer=buffer.replace(/\r\n?/g,"\n");
       let boundary;
       while((boundary=buffer.indexOf("\n\n"))!==-1) {
         consumeFrame(buffer.slice(0,boundary));
@@ -1812,17 +1840,13 @@ async function readVenusResponse(response,onText) {
       }
     }
     buffer+=decoder.decode();
+    buffer=buffer.replace(/\r\n?/g,"\n");
     if(buffer.trim()) {
-      // Some SSE endpoints omit a final blank line; also handle single-newline events.
-      const pending=buffer.replace(/\r\n/g,"\n");
-      if(pending.includes("\n\n")) {
-        pending.split("\n\n").forEach(consumeFrame);
-      } else {
-        pending.split("\n").filter(Boolean).forEach(consumeFrame);
-      }
+      // A few gateways end SSE without the final blank line.
+      for(const frame of buffer.split("\n\n")) consumeFrame(frame);
     }
-  } finally { try {reader.releaseLock();}catch {} }
-  return {finishReason:reason,interrupted:readAny && !receivedDone && reason==null};
+  } finally {try{reader.releaseLock();}catch{}}
+  return {finishReason:reason,interrupted:receivedText&&!receivedDone&&!reason,empty:!receivedText};
 }
 
 function mergeCodeContinuation(previous,continued) {
@@ -1883,11 +1907,33 @@ async function requestVenusOnce(messages,model,headers,signal,maxTokens=1024) {
   });
   if(!response.ok) {
     const raw=await response.text().catch(()=>"");
-    throw new Error(`Ошибка ${response.status}${raw?": "+raw.slice(0,300):""}`);
+    let detail=raw;
+    try {
+      const parsed=JSON.parse(raw);
+      detail=parsed.error?.message||parsed.error||parsed.message||raw;
+    }catch{}
+    const e=new Error(`Ошибка API ${response.status}: ${String(detail).slice(0,260)}`);
+    e.status=response.status;
+    throw e;
   }
   let output="";
-  await readVenusResponse(response,p=>{output+=p;});
-  return output.trim();
+  const result=await readVenusResponse(response,p=>{output+=p;});
+  return {text:output,reason:result.finishReason,empty:!output.trim()};
+}
+
+async function requestVisibleCode(messages,model,headers,signal,tokenBudget,update) {
+  const attempts=[
+    Math.min(STANDARD_CODE_REQUEST_TOKENS,tokenBudget),
+    Math.min(BACKUP_CODE_REQUEST_TOKENS,tokenBudget),
+    Math.min(2048,tokenBudget)
+  ].filter((n,i,arr)=>n>0&&arr.indexOf(n)===i);
+  for(let i=0;i<attempts.length;i++) {
+    if(signal.aborted) throw new DOMException("Отменено","AbortError");
+    if(i>0) update?.(`Модель не прислала текст. Повторяю с лимитом ${attempts[i]} токенов.`);
+    const response=await requestVenusOnce(messages,model,headers,signal,attempts[i]);
+    if(response.text.trim()) return response;
+  }
+  return {text:"",reason:"empty",empty:true};
 }
 
 const PLAN_FOR_CODE = `Составь короткий технический план реализации задачи, которую пользователь только что поставил.
@@ -1916,6 +1962,11 @@ async function send(text,attachmentsOverride=null) {
     : attachmentsOverride.slice();
 
   if((!text && !chosenAttachments.length)||busy||!currentUser)return;
+  if(!auth.currentUser) {
+    openAuth("login");
+    authError("Чтобы отправить сообщение, войдите в аккаунт Venus AI.");
+    return;
+  }
   if(!text && chosenAttachments.length) text="Посмотри прикреплённые файлы и помоги с ними.";
 
   let c=active();
@@ -1980,12 +2031,19 @@ async function send(text,attachmentsOverride=null) {
     let outputMessages=messages;
     if(codeBuild) {
       // Actual short planning request: no pretend background thinking.
-      const plan=await requestVenusOnce(
-        [...messages,{role:"user",content:PLAN_FOR_CODE}],
-        selectedModel,requestHeaders,ctrl.signal
-      );
+      let plan="";
+      try {
+        const planning=await requestVenusOnce(
+          [...messages,{role:"user",content:PLAN_FOR_CODE}],
+          selectedModel,requestHeaders,ctrl.signal,512
+        );
+        plan=planning.text.trim();
+      } catch(error) {
+        if(ctrl.signal.aborted || [401,403].includes(error.status)) throw error;
+        console.warn("Venus AI: planning skipped",error);
+      }
       outputMessages=[...messages,{role:"user",content:finalCodeInstruction(plan.slice(0,1000))}];
-      progress(1,"План готов. Формирую исходные файлы без сокращений.");
+      progress(1,plan?"План готов. Создаю исходные файлы.":"Создаю файлы без отдельного этапа плана.");
     }
 
     // Keep requesting continuation when a file or response is truncated.
@@ -2003,7 +2061,9 @@ async function send(text,attachmentsOverride=null) {
         ? MAX_TOTAL_CODE_TOKENS-estimateOutputTokens(am.content)
         : MAX_TOKENS_PER_REQUEST;
       if(codeBuild && remainingTokens<=0) {budgetHit=true;break;}
-      const responseTokenLimit=Math.min(MAX_TOKENS_PER_REQUEST,Math.max(1,remainingTokens));
+      const responseTokenLimit=codeBuild
+        ? Math.min(STANDARD_CODE_REQUEST_TOKENS,Math.max(1,remainingTokens))
+        : Math.min(MAX_TOKENS_PER_REQUEST,Math.max(1,remainingTokens));
       const attemptController=new AbortController();
       const abortAttempt=()=>attemptController.abort();
       ctrl.signal.addEventListener("abort",abortAttempt,{once:true});
@@ -2015,7 +2075,7 @@ async function send(text,attachmentsOverride=null) {
         body:JSON.stringify({
           model:selectedModel,
           messages:conversation,
-          stream:true,
+          stream:!codeBuild,
           max_tokens:responseTokenLimit
         })
       });
@@ -2075,16 +2135,30 @@ async function send(text,attachmentsOverride=null) {
       // Some reasoning models return only an empty SSE event. Retry in JSON mode
       // before showing a misleading "model returned no answer" message.
       if(!currentPart.trim()) {
-        if(round===0) progress(1,"Потоковый ответ пуст. Повторяю запрос обычным способом.");
         try {
-          const fallback=await requestVenusOnce(
-            conversation,selectedModel,requestHeaders,ctrl.signal,
-            Math.min(MAX_TOKENS_PER_REQUEST,Math.max(1,remainingTokens))
-          );
-          if(fallback.trim()) addText(fallback);
+          if(codeBuild) {
+            const fallback=await requestVisibleCode(
+              conversation,selectedModel,requestHeaders,ctrl.signal,
+              Math.max(1,remainingTokens),
+              detail=>progress(1,detail)
+            );
+            if(fallback.text.trim()) {
+              addText(fallback.text);
+              result={finishReason:fallback.reason,interrupted:false};
+            }
+          } else {
+            const fallback=await requestVenusOnce(
+              conversation,selectedModel,requestHeaders,ctrl.signal,4096
+            );
+            if(fallback.text.trim()) {
+              addText(fallback.text);
+              result={finishReason:fallback.reason,interrupted:false};
+            }
+          }
         } catch(fallbackError) {
-          if(ctrl.signal.aborted) throw fallbackError;
-          console.warn("Venus AI: empty stream, non-stream retry failed",fallbackError);
+          if(ctrl.signal.aborted || fallbackError.status===401 || fallbackError.status===403)
+            throw fallbackError;
+          console.warn("Venus AI: response retry failed",fallbackError);
         }
       }
       if(!currentPart.trim()) {
@@ -2093,7 +2167,7 @@ async function send(text,attachmentsOverride=null) {
           interrupted=true;
           break;
         }
-        if(round<2 && round<maxRounds-1) {
+        if(round<1 && round<maxRounds-1) {
           // A fresh, short instruction can nudge reasoning-only completions
           // to deliver visible content, without changing the original task.
           conversation=[...outputMessages,{
@@ -2102,7 +2176,7 @@ async function send(text,attachmentsOverride=null) {
           }];
           continue;
         }
-        throw new Error("Модель вернула пустой ответ после повторных запросов. Попробуйте High или Flash.");
+        throw new Error("Модель не прислала текст даже после повторных попыток. Выберите другую модель или повторите запрос.");
       }
       outputReason=result.finishReason;
       interrupted=result.interrupted;
@@ -2117,7 +2191,8 @@ async function send(text,attachmentsOverride=null) {
       if(stalled>=3) {interrupted=true;break;}
       const unfinished=hasUnclosedCodeFence(am.content);
       const limitHit=outputReason==="length";
-      if(!limitHit && !unfinished && !interrupted) break;
+      if(codeBuild && !unfinished && !inspectCodeFiles(am.content).issues.length) break;
+      if(!codeBuild && !limitHit && !unfinished && !interrupted) break;
       if(round===maxRounds-1) break;
       // Build context for the next round without resending partial code as an unrelated prompt.
       const prompt=unfinished
@@ -2130,7 +2205,7 @@ async function send(text,attachmentsOverride=null) {
       conversation=[...outputMessages,{role:"assistant",content:am.content},{role:"user",content:prompt}];
     }
     if(codeBuild) {
-      progress(2,"Проверяю целостность блоков кода и имена файлов.");
+      progress(2,"Проверяю структуру файлов и закрытие блоков кода.");
       let checked=inspectCodeFiles(am.content);
       // A closed code fence can still contain invalid JSON or an HTML document
       // with missing closing tags. Ask for a complete replacement, not a suffix.
@@ -2139,11 +2214,12 @@ async function send(text,attachmentsOverride=null) {
           if(ctrl.signal.aborted) throw new DOMException("Aborted","AbortError");
           progress(2,"Исправляю структуру файлов: попытка " + (fix+1) + " из 2.");
           try {
-            const replacement=await requestVenusOnce([
+            const repairedResponse=await requestVenusOnce([
               ...outputMessages,
               {role:"assistant",content:am.content},
               {role:"user",content:"Проверка обнаружила проблемы: " + checked.issues.join("; ") + ". Исправь ВСЕ ошибки и выдай ВСЕ исходные файлы полностью заново в блоках ``` с именами файлов. Никаких сокращений и заглушек."}
-            ],selectedModel,requestHeaders,ctrl.signal,MAX_TOKENS_PER_REQUEST);
+            ],selectedModel,requestHeaders,ctrl.signal,Math.min(STANDARD_CODE_REQUEST_TOKENS,MAX_TOTAL_CODE_TOKENS-estimateOutputTokens(am.content)));
+            const replacement=repairedResponse.text;
             const proposed=inspectCodeFiles(replacement);
             if(replacement && !proposed.issues.length && estimateOutputTokens(replacement)<=MAX_TOTAL_CODE_TOKENS) {
               am.content=replacement;
@@ -2256,17 +2332,18 @@ async function resumeIncompleteCode(index) {
       const requestedTokens=needsReplacement
         ? MAX_TOKENS_PER_REQUEST
         : Math.min(MAX_TOKENS_PER_REQUEST,budget);
-      const response=await fetch(API_URL,{
-        method:"POST",headers,signal:ctrl.signal,
-        body:JSON.stringify({model,messages:context,stream:true,max_tokens:requestedTokens})
-      });
-      if(!response.ok) {
-        const errorText=await response.text().catch(()=>"");
-        throw new Error("Ошибка " + response.status + (errorText?": " + errorText.slice(0,220):""));
+      const response=await requestVisibleCode(
+        context,model,headers,ctrl.signal,
+        Math.min(STANDARD_CODE_REQUEST_TOKENS,requestedTokens),
+        ()=>{}
+      );
+      const extra=response.text;
+      const result={finishReason:response.reason,interrupted:response.empty};
+      if(!extra.trim()) {
+        unchanged++;
+        if(unchanged>=2)break;
+        continue;
       }
-      let extra="";
-      const result=await readVenusResponse(response,p=>{extra+=p;});
-      if(!extra.trim()) {unchanged++;if(unchanged>=2)break;continue;}
       const candidate=needsReplacement ? extra : mergeCodeContinuation(previous,extra);
       if(estimateOutputTokens(candidate)>MAX_TOTAL_CODE_TOKENS) {
         message.tokenBudgetHit=true;
