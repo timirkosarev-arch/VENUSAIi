@@ -14,8 +14,8 @@ const MODELS = {
 const ADMIN_EMAIL = "flexadssq@gmail.com";
 const PRO_MS = 30 * 24 * 60 * 60 * 1000;
 
-const TOTAL_TIMEOUT_MS = 23000;
-const MAX_TOKENS_PER_CALL = 2048;
+const TOTAL_TIMEOUT_MS = 150000;
+const MAX_TOKENS_PER_CALL = 3072;
 const MAX_MESSAGES = 40;
 const MAX_CONTENT_CHARS = 250000;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -153,7 +153,8 @@ async function checkPro(user, signal) {
   const end = Number(g?.expiresAt);
   const now = Date.now();
 
-  const valid = g &&
+  const valid =
+    g &&
     normalEmail(g.email) === normalEmail(user.email) &&
     normalEmail(g.grantedBy) === ADMIN_EMAIL &&
     Number.isFinite(start) &&
@@ -172,10 +173,12 @@ async function checkPro(user, signal) {
 }
 
 function allowedImageUrl(url) {
-  return url.protocol === "https:" &&
+  return (
+    url.protocol === "https:" &&
     ["i.ibb.co", "i.ibb.co.com"].includes(
       url.hostname.toLowerCase()
-    );
+    )
+  );
 }
 
 async function imageToDataUrl(source, signal) {
@@ -184,10 +187,7 @@ async function imageToDataUrl(source, signal) {
   try {
     url = new URL(source);
   } catch {
-    throw fail(
-      400,
-      "Неверная ссылка на фото."
-    );
+    throw fail(400, "Неверная ссылка на фото.");
   }
 
   for (let i = 0; i < 5; i++) {
@@ -244,8 +244,9 @@ async function imageToDataUrl(source, signal) {
     }
 
     if (
-      Number(response.headers.get("content-length") || 0) >
-      MAX_IMAGE_BYTES
+      Number(
+        response.headers.get("content-length") || 0
+      ) > MAX_IMAGE_BYTES
     ) {
       throw fail(
         413,
@@ -347,8 +348,10 @@ async function cleanContent(content, signal) {
 
       if (
         !match ||
-        Buffer.from(match[2], "base64").length >
-        MAX_IMAGE_BYTES
+        Buffer.from(
+          match[2],
+          "base64"
+        ).length > MAX_IMAGE_BYTES
       ) {
         throw fail(
           400,
@@ -375,7 +378,9 @@ function readText(data) {
   const message = data?.choices?.[0]?.message;
   const value = message?.content;
 
-  if (typeof value === "string") return value;
+  if (typeof value === "string") {
+    return value;
+  }
 
   if (Array.isArray(value)) {
     return value.map(
@@ -393,14 +398,15 @@ function describeError(error, signal) {
   ) {
     return {
       status: 503,
-      message: "Ответ слишком долгий. Venus AI может повторить запрос меньшей частью."
+      message:
+        "Ответ слишком долгий. Venus AI может повторить запрос меньшей частью."
     };
   }
 
   return {
     status: error?.status || 500,
-    message: error?.message ||
-      "Ошибка сервера Venus AI."
+    message:
+      error?.message || "Ошибка сервера Venus AI."
   };
 }
 
@@ -438,9 +444,10 @@ export default async function handler(req, res) {
       );
     }
 
-    const body = typeof req.body === "string"
-      ? JSON.parse(req.body)
-      : req.body;
+    const body =
+      typeof req.body === "string"
+        ? JSON.parse(req.body)
+        : req.body;
 
     if (
       !body ||
@@ -458,8 +465,7 @@ export default async function handler(req, res) {
       "cx/gpt-6.1-sol": MODELS.high
     };
 
-    const model =
-      aliases[body.model] || body.model;
+    const model = aliases[body.model] || body.model;
 
     if (!Object.values(MODELS).includes(model)) {
       throw fail(
@@ -498,9 +504,13 @@ export default async function handler(req, res) {
 
     const messages = [];
 
-    for (const msg of body.messages.slice(-MAX_MESSAGES)) {
+    for (
+      const msg of body.messages.slice(-MAX_MESSAGES)
+    ) {
       if (
-        !["system", "user", "assistant"].includes(msg?.role)
+        !["system", "user", "assistant"].includes(
+          msg?.role
+        )
       ) {
         continue;
       }
@@ -522,7 +532,9 @@ export default async function handler(req, res) {
       }
     }
 
-    if (!messages.some(m => m.role === "user")) {
+    if (
+      !messages.some(m => m.role === "user")
+    ) {
       throw fail(
         400,
         "Нет сообщения пользователя."
@@ -532,7 +544,8 @@ export default async function handler(req, res) {
     const requested = Number(body.max_tokens);
 
     const maxTokens =
-      Number.isFinite(requested) && requested > 0
+      Number.isFinite(requested) &&
+      requested > 0
         ? Math.min(
             MAX_TOKENS_PER_CALL,
             Math.floor(requested)
@@ -545,11 +558,19 @@ export default async function handler(req, res) {
       model,
       messages,
       stream,
-      max_tokens: maxTokens
+      max_tokens: maxTokens,
+      ...(stream
+        ? {
+            stream_options: {
+              include_usage: true
+            }
+          }
+        : {})
     };
 
     const headers = {
-      Authorization: `Bearer ${process.env.API_KEY}`,
+      Authorization:
+        `Bearer ${process.env.API_KEY}`,
       "Content-Type": "application/json",
       Accept: stream
         ? "text/event-stream"
@@ -561,11 +582,15 @@ export default async function handler(req, res) {
     let response;
     let upstreamError = "";
 
-    for (const limit of [
+    const limits = [
       ...new Set(
-        [maxTokens, 1024, 512].filter(n => n <= maxTokens)
+        [maxTokens, 1024, 512].filter(
+          n => n <= maxTokens
+        )
       )
-    ]) {
+    ];
+
+    for (const limit of limits) {
       payload.max_tokens = limit;
 
       response = await bounded(
@@ -587,12 +612,44 @@ export default async function handler(req, res) {
         )
       ).slice(0, 600);
 
+      // Некоторые провайдеры не поддерживают stream_options.
       if (
-        !(
-          [400, 422].includes(response.status) &&
-          /(?:max[_ -]?(?:completion[_ -]?)?tokens?|output.{0,20}tokens?|context.{0,20}length)/i.test(upstreamError)
+        stream &&
+        [400, 422].includes(response.status) &&
+        payload.stream_options &&
+        /stream[_ -]?options|include[_ -]?usage/i.test(
+          upstreamError
         )
       ) {
+        delete payload.stream_options;
+
+        response = await bounded(
+          fetch(API_URL, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload),
+            signal: controller.signal
+          }),
+          controller.signal
+        );
+
+        if (response.ok) break;
+
+        upstreamError = (
+          await bounded(
+            response.text(),
+            controller.signal
+          )
+        ).slice(0, 600);
+      }
+
+      const tokenLimitError =
+        [400, 422].includes(response.status) &&
+        /(?:max[_ -]?(?:completion[_ -]?)?tokens?|output.{0,20}tokens?|context.{0,20}length)/i.test(
+          upstreamError
+        );
+
+      if (!tokenLimitError) {
         throw fail(
           502,
           `AnyModel HTTP ${response.status}: ${upstreamError}`
@@ -653,7 +710,8 @@ export default async function handler(req, res) {
           res.write(
             `data: ${JSON.stringify({
               error: {
-                message: "Модель вернула пустой поток. Повторите запрос."
+                message:
+                  "Модель вернула пустой поток. Повторите запрос."
               }
             })}\n\n`
           );
@@ -718,7 +776,6 @@ export default async function handler(req, res) {
     );
 
     return res.status(200).json(data);
-
   } catch (error) {
     const info = describeError(
       error,
@@ -740,7 +797,6 @@ export default async function handler(req, res) {
       error: info.message,
       stage
     });
-
   } finally {
     clearTimeout(timer);
   }
