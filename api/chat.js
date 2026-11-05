@@ -8,14 +8,14 @@ const API_URL = "https://anymodel.org/v1/chat/completions";
 const MODELS = {
   flash: "cx/gpt-6-luna",
   high: "cx/gpt-6-sol",
-  astro: "cx/gpt-6-astra"
+  astro: "cc/claude-opus-5-5"
 };
 
 const ADMIN_EMAIL = "flexadssq@gmail.com";
 const PRO_MS = 30 * 24 * 60 * 60 * 1000;
 
 const TOTAL_TIMEOUT_MS = 40000;
-const MAX_TOKENS_PER_CALL = 1536;
+const MAX_TOKENS_PER_CALL = 30000;
 const MAX_MESSAGES = 40;
 const MAX_CONTENT_CHARS = 250000;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -412,7 +412,7 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     return res.status(200).json({
       ok: true,
-      version: "venus-lines-timeout-fix-3"
+      version: "venus-opus-5-5-30k"
     });
   }
 
@@ -442,10 +442,9 @@ export default async function handler(req, res) {
       );
     }
 
-    const body =
-      typeof req.body === "string"
-        ? JSON.parse(req.body)
-        : req.body;
+    const body = typeof req.body === "string"
+      ? JSON.parse(req.body)
+      : req.body;
 
     if (
       !body ||
@@ -460,11 +459,11 @@ export default async function handler(req, res) {
 
     const aliases = {
       ...MODELS,
-      "cx/gpt-6.1-sol": MODELS.high
+      "cx/gpt-6.1-sol": MODELS.high,
+      "cx/gpt-6-astra": MODELS.astro
     };
 
-    const model =
-      aliases[body.model] || body.model;
+    const model = aliases[body.model] || body.model;
 
     if (!Object.values(MODELS).includes(model)) {
       throw fail(
@@ -539,8 +538,7 @@ export default async function handler(req, res) {
     const requested = Number(body.max_tokens);
 
     const maxTokens =
-      Number.isFinite(requested) &&
-      requested > 0
+      Number.isFinite(requested) && requested > 0
         ? Math.min(
             MAX_TOKENS_PER_CALL,
             Math.floor(requested)
