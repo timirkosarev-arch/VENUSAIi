@@ -610,6 +610,56 @@ textarea::placeholder {color:var(--muted)}
 }
 ::-webkit-scrollbar {width:8px}
 ::-webkit-scrollbar-thumb {background:var(--line);border-radius:8px}
+
+
+/* PRO SUBSCRIPTION */
+.pro-upgrade {
+  border:1px solid #9b5de5;
+  background:linear-gradient(110deg,#24113b,#3b1760 55%,#25103e);
+  color:#f3e8ff;font-weight:700;box-shadow:0 0 18px #9333ea2b;
+}
+.pro-upgrade:hover {border-color:#d8b4fe;box-shadow:0 0 22px #a855f755}
+.admin-open {width:100%;justify-content:center;margin-top:8px;border:1px solid #7650a0;color:#e9d5ff}
+.pro-status {
+  display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;
+  margin:0 14px 8px;padding:9px 14px;border:1px solid #9d61f5;border-radius:12px;
+  background:linear-gradient(100deg,#21102f,#35134f,#21102f);
+  box-shadow:0 0 18px #a855f766,inset 0 0 14px #a855f71c;
+  animation:proGlow 2s ease-in-out infinite alternate;color:#f5eaff;font-size:13px;
+}
+.pro-status strong {color:#fff;text-shadow:0 0 10px #d8b4fe}
+.pro-status span {color:#d8b4fe;font-variant-numeric:tabular-nums}
+@keyframes proGlow {from{box-shadow:0 0 10px #a855f744,inset 0 0 8px #a855f711}to{box-shadow:0 0 24px #a855f788,inset 0 0 16px #a855f733}}
+.pro-card {text-align:center;max-width:420px;gap:14px}
+.pro-kicker {font-size:11px;letter-spacing:3px;color:#c084fc;font-weight:800}
+.pro-card h2 {font-size:26px;letter-spacing:.5px}
+.pro-description {font-size:13px;color:var(--muted);line-height:1.5}
+.pro-price-line {display:flex;align-items:baseline;justify-content:center;gap:9px;margin:4px 0}
+.old-price {font-size:23px;color:#8b8297;text-decoration:line-through;text-decoration-thickness:2px}
+.new-price {font-size:48px;font-weight:900;line-height:1;color:#d8b4fe;text-shadow:0 0 10px #a855f7,0 0 26px #9333ea;animation:priceGlow 1.4s ease-in-out infinite alternate}
+.per-month {font-size:14px;color:var(--muted)}
+.pro-price-note {font-size:12px;color:#c4a5fd}
+@keyframes priceGlow {from{text-shadow:0 0 8px #a855f7,0 0 16px #9333ea}to{text-shadow:0 0 14px #d8b4fe,0 0 32px #9333ea}}
+.pro-buy {width:100%;padding:13px;font-size:15px;font-weight:800}
+.admin-card {max-height:min(86vh,720px);overflow:auto}
+.admin-card label {gap:7px}
+.admin-email-input {width:100%;padding:11px 12px;background:#090909;color:#fff;border:1px solid var(--line);border-radius:10px;outline:none}
+.admin-email-input:focus {border-color:var(--accent)}
+.admin-feedback {min-height:18px;font-size:12px;color:#c4a5fd}
+.grant-list-title {font-size:13px;font-weight:700;color:#e9d5ff;margin-top:4px}
+.grant-list {display:flex;flex-direction:column;gap:7px;max-height:260px;overflow:auto}
+.grant-empty {font-size:12px;color:var(--muted);padding:10px;border:1px dashed var(--line);border-radius:9px;text-align:center}
+.grant-row {display:flex;align-items:center;gap:8px;padding:9px;background:#0b0b0b;border:1px solid var(--line);border-radius:10px}
+.grant-meta {flex:1;min-width:0}
+.grant-email {font-size:12px;overflow-wrap:anywhere;color:#f3e8ff}
+.grant-expiry {font-size:10px;color:var(--muted)}
+.grant-remove {border:1px solid #65304b;background:#2a101c;color:#ffb4c4;border-radius:8px;padding:6px 9px;font-size:11px}
+@media(max-width:520px) {
+  .pro-status {margin-left:8px;margin-right:8px;font-size:12px}
+  .pro-card h2 {font-size:23px}
+  .new-price {font-size:42px}
+}
+
 </style>
 </head>
 
@@ -693,6 +743,7 @@ textarea::placeholder {color:var(--muted)}
     </div>
 
     <button class="new" id="newBtn">＋ Новый чат</button>
+    <button class="new pro-upgrade" id="upgradeBtn" type="button">Перейти на Pro</button>
 
     <div class="list" id="list"></div>
 
@@ -700,16 +751,18 @@ textarea::placeholder {color:var(--muted)}
 
       <div class="foot-actions">
 
-        <button class="new" id="setBtn">⚙ Настройки</button>
+        <button class="new" id="setBtn">Настройки</button>
 
         <a class="new telegram"
           href="https://t.me/venus1ai"
           target="_blank"
           rel="noopener">
-          ✈ Telegram
+          Telegram
         </a>
 
       </div>
+
+      <button class="new admin-open" id="adminBtn" type="button" hidden>Выдать Pro</button>
 
       <button class="new register-guest" id="registerBtn" type="button">
         Войти / Регистрация
@@ -741,6 +794,11 @@ textarea::placeholder {color:var(--muted)}
       <div class="title" id="ttl">Venus AI</div>
     </div>
 
+    <div class="pro-status" id="proStatus" hidden>
+      <strong>Подписка оформлена</strong>
+      <span id="proCountdown">Осталось 30 дней</span>
+    </div>
+
     <div class="msgs" id="msgs">
       <div class="wrap" id="wrap"></div>
     </div>
@@ -755,13 +813,14 @@ textarea::placeholder {color:var(--muted)}
           placeholder="Напишите сообщение Venus AI…"
         ></textarea>
 
-        <button class="attach" id="attachBtn" type="button" title="Прикрепить фото или файл" aria-label="Прикрепить фото или файл">📎</button>
+        <button class="attach" id="attachBtn" type="button" title="Прикрепить фото или файл" aria-label="Прикрепить фото или файл">+</button>
         <input id="fileInput" type="file" hidden multiple
           accept="image/*,.pdf,.txt,.md,.json,.csv,.html,.htm,.css,.js,.mjs,.ts,.tsx,.jsx,.py,.lua,.java,.c,.cpp,.h,.cs,.go,.rs,.sql,.xml,.yaml,.yml,.toml,.ini,.log,.sh,.docx,.xlsx" />
 
         <select class="model-select" id="modelSelect" title="Модель">
-          <option value="ag/gemini-3.1-flash-lite-preview">⚡ Flash</option>
-          <option value="cc/claude-sonnet-5-5">🧠 High</option>
+          <option value="cx/gpt-6-luna">Flash</option>
+          <option value="cx/gpt-6.1-sol">High</option>
+          <option id="proModelOption" value="cx/gpt-6-astra" hidden>Pro High — GPT-6 ASTRO</option>
         </select>
 
         <button class="send" id="send" disabled
@@ -811,6 +870,45 @@ textarea::placeholder {color:var(--muted)}
   </div>
 </div>
 
+<!-- PRO OFFER -->
+<div class="mod" id="proMod">
+  <div class="card pro-card">
+    <div class="pro-kicker">VENUS AI PRO</div>
+    <h2>GPT-6 ASTRO</h2>
+    <p class="pro-description">Доступ к модели Pro High на 30 дней.</p>
+    <div class="pro-price-line">
+      <span class="old-price">$20</span>
+      <span class="new-price">$10</span>
+      <span class="per-month">/ месяц</span>
+    </div>
+    <div class="pro-price-note">Стартовая цена — $10 за 30 дней.</div>
+    <button class="btn p pro-buy" id="buyProBtn" type="button">Купить за $10</button>
+    <p class="pro-description">Для оформления напишите владельцу в Telegram. Подписка включается после подтверждения оплаты.</p>
+    <div class="btns">
+      <button class="btn" id="closeProBtn" type="button">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN PRO MANAGEMENT -->
+<div class="mod" id="adminMod">
+  <div class="card admin-card">
+    <h2>Выдать Pro</h2>
+    <p class="pro-description">Введите email аккаунта, который уже хотя бы раз входил на сайт. Доступ будет выдан на 30 дней.</p>
+    <label>
+      Почта пользователя
+      <input class="admin-email-input" id="grantEmail" type="email" placeholder="user@gmail.com" autocomplete="off">
+    </label>
+    <button class="btn p" id="grantProBtn" type="button">Выдать Pro на 30 дней</button>
+    <div class="admin-feedback" id="adminFeedback" aria-live="polite"></div>
+    <div class="grant-list-title">Список выданных подписок</div>
+    <div class="grant-list" id="grantList"></div>
+    <div class="btns">
+      <button class="btn" id="closeAdminBtn" type="button">Закрыть</button>
+    </div>
+  </div>
+</div>
+
 <!-- FIREBASE + APP -->
 
 <script type="module">
@@ -831,6 +929,9 @@ import {
   signOut
 } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
 
+import { getDatabase, ref, get, set, remove }
+  from "https://www.gstatic.com/firebasejs/12.5.0/firebase-database.js";
+
 
 /* FIREBASE CONFIG */
 
@@ -847,6 +948,7 @@ const firebaseConfig = {
 
 const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
+const database = getDatabase(firebaseApp);
 
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
@@ -893,9 +995,14 @@ const DEFAULT_SYS = `Ты Venus AI — сильный и практичный И
 - При неоднозначностях выбирай разумные настройки самостоятельно; задавай вопрос только при реальной необходимости.`;
 
 const MODELS = {
-  flash: "ag/gemini-3.1-flash-lite-preview",
-  high: "cc/claude-sonnet-5-5"
+  flash: "cx/gpt-6-luna",
+  high: "cx/gpt-6.1-sol",
+  pro: "cx/gpt-6-astra"
 };
+
+const ADMIN_EMAIL = "flexadssq@gmail.com";
+const PRO_STORAGE_KEY = "venus_pro_grants_v1";
+const PRO_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 
 const ALL_MODEL_VALUES = new Set(Object.values(MODELS));
 
@@ -917,6 +1024,97 @@ const store = {
   }
 
 };
+
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+function getProGrants() {
+  const value = store.get(PRO_STORAGE_KEY, {});
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function saveProGrants(grants) {
+  store.set(PRO_STORAGE_KEY, grants);
+}
+
+function getActiveProGrant(email) {
+  const key = normalizeEmail(email);
+  if (!key) return null;
+  const grants = getProGrants();
+  const grant = grants[key];
+  if (!grant || !Number.isFinite(Number(grant.expiresAt))) return null;
+  if (Number(grant.expiresAt) <= Date.now()) {
+    delete grants[key];
+    saveProGrants(grants);
+    return null;
+  }
+  return grant;
+}
+
+function hasActivePro(email) {
+  return !!getActiveProGrant(email);
+}
+
+function formatProRemaining(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const days = Math.floor(total / 86400);
+  const hours = Math.floor((total % 86400) / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+  return `До окончания: ${days} дн. ${String(hours).padStart(2,"0")} ч. ${String(minutes).padStart(2,"0")} мин. ${String(seconds).padStart(2,"0")} сек.`;
+}
+
+function refreshProCountdown() {
+  const grant = getActiveProGrant(currentUser?.email);
+  if (!grant) {
+    $("proStatus").hidden = true;
+    $("proModelOption").hidden = true;
+    if ($("modelSelect").value === MODELS.pro) {
+      $("modelSelect").value = MODELS.flash;
+      if (currentUser?.uid) store.set(modelKey(currentUser.uid), MODELS.flash);
+    }
+    return false;
+  }
+  $("proCountdown").textContent = formatProRemaining(Number(grant.expiresAt) - Date.now());
+  return true;
+}
+
+function refreshProUI() {
+  const isAdmin = normalizeEmail(currentUser?.email) === ADMIN_EMAIL;
+  const grant = getActiveProGrant(currentUser?.email);
+  const hasPro = !!grant;
+  $("adminBtn").hidden = !isAdmin;
+  $("proModelOption").hidden = !hasPro;
+  $("proStatus").hidden = !hasPro;
+  $("upgradeBtn").textContent = hasPro ? "Pro — подписка активна" : "Перейти на Pro";
+  if (!hasPro && $("modelSelect").value === MODELS.pro) {
+    $("modelSelect").value = MODELS.flash;
+    if (currentUser?.uid) store.set(modelKey(currentUser.uid), MODELS.flash);
+  }
+  if (hasPro) refreshProCountdown();
+}
+
+
+async function syncProForUser(user) {
+  if (!user?.uid || !user.email || user.uid === "guest") return;
+  try {
+    await set(ref(database, `venusPro/userIndex/${user.uid}`), {
+      email: normalizeEmail(user.email),
+      updatedAt: Date.now()
+    });
+    const snapshot = await get(ref(database, `venusPro/grants/${user.uid}`));
+    const grants = getProGrants();
+    const email = normalizeEmail(user.email);
+    const grant = snapshot.exists() ? snapshot.val() : null;
+    if (grant && Number(grant.expiresAt) > Date.now()) grants[email] = grant;
+    else delete grants[email];
+    saveProGrants(grants);
+    refreshProUI();
+  } catch (error) {
+    console.error("Не удалось синхронизировать Pro через Firebase:", error);
+  }
+}
 
 let currentUser = {uid:"guest",displayName:"Гость",email:""};
 let currentChats = [];
@@ -1209,6 +1407,8 @@ onAuthStateChanged(auth,user => {
     ? (user.displayName || "Пользователь")
     : "Гость";
   $("accountEmail").textContent = user ? (user.email || "") : "Без регистрации";
+  refreshProUI();
+  if (user) void syncProForUser(user);
   $("logoutBtn").hidden = !user;
   $("registerBtn").hidden = !!user;
   $("list").hidden = !user;
@@ -1238,6 +1438,11 @@ $("authBack").onclick = () => {
 
 $("modelSelect").addEventListener("change",() => {
   if (!currentUser) return;
+  if ($("modelSelect").value === MODELS.pro && !hasActivePro(currentUser.email)) {
+    $("modelSelect").value = MODELS.flash;
+    alert("Модель Pro High доступна только с активной подпиской Pro.");
+    return;
+  }
   store.set(modelKey(currentUser.uid),$("modelSelect").value);
 });
 
@@ -1450,7 +1655,7 @@ function msgHTML(m,index) {
           ? (a.remoteUrl
               ? `<img src="${esc(a.remoteUrl)}" alt="${esc(a.name)}" loading="lazy">`
               : `<img data-media-id="${esc(a.mediaId)}" alt="${esc(a.name)}" loading="lazy">`)
-          : `<div class="user-file">📄 <span>${esc(a.name)}</span></div>`
+          : `<div class="user-file">FILE <span>${esc(a.name)}</span></div>`
         ).join("")}
       </div>` : "";
     return `
@@ -1625,7 +1830,7 @@ function renderPendingAttachments() {
     <div class="attachment-item">
       ${a.kind==="image"
         ? `<img src="${a.previewUrl}" alt="${esc(a.name)}">`
-        : `<div class="file-icon">📄</div>`}
+        : `<div class="file-icon">FILE</div>`}
       <div class="file-name" title="${esc(a.name)}">${esc(a.name)}</div>
       <button class="remove-attachment" type="button" data-remove-attachment="${i}" aria-label="Убрать файл">×</button>
     </div>
@@ -1966,6 +2171,152 @@ function grow() {
 
 }
 
+
+/* PRO SUBSCRIPTIONS AND ADMIN PANEL */
+
+$("upgradeBtn").onclick = () => {
+  $("proMod").classList.add("on");
+  closeSide();
+};
+
+$("closeProBtn").onclick = () => $("proMod").classList.remove("on");
+$("proMod").addEventListener("click", e => {
+  if (e.target === $("proMod")) $("proMod").classList.remove("on");
+});
+
+$("buyProBtn").onclick = () => {
+  window.open("https://t.me/omge5", "_blank", "noopener,noreferrer");
+};
+
+async function renderAdminGrantList() {
+  const list = $("grantList");
+  list.innerHTML = "";
+  const loading = document.createElement("div");
+  loading.className = "grant-empty";
+  loading.textContent = "Загрузка списка...";
+  list.appendChild(loading);
+
+  const [usersSnapshot, grantsSnapshot] = await Promise.all([
+    get(ref(database, "venusPro/userIndex")),
+    get(ref(database, "venusPro/grants"))
+  ]);
+  const users = usersSnapshot.exists() ? usersSnapshot.val() : {};
+  const grants = grantsSnapshot.exists() ? grantsSnapshot.val() : {};
+  list.innerHTML = "";
+  const entries = Object.entries(grants).sort((a,b) => Number(b[1]?.grantedAt || 0) - Number(a[1]?.grantedAt || 0));
+  if (!entries.length) {
+    const empty = document.createElement("div");
+    empty.className = "grant-empty";
+    empty.textContent = "Пока нет выданных подписок.";
+    list.appendChild(empty);
+    return;
+  }
+  for (const [uid, grant] of entries) {
+    const email = normalizeEmail(grant?.email || users[uid]?.email || "Аккаунт без email");
+    const row = document.createElement("div");
+    row.className = "grant-row";
+    const meta = document.createElement("div");
+    meta.className = "grant-meta";
+    const emailNode = document.createElement("div");
+    emailNode.className = "grant-email";
+    emailNode.textContent = email;
+    const expiry = document.createElement("div");
+    expiry.className = "grant-expiry";
+    const expiresAt = Number(grant?.expiresAt || 0);
+    expiry.textContent = expiresAt > Date.now()
+      ? "До " + new Date(expiresAt).toLocaleString("ru-RU")
+      : "Подписка истекла";
+    const removeButton = document.createElement("button");
+    removeButton.className = "grant-remove";
+    removeButton.type = "button";
+    removeButton.textContent = "Отозвать";
+    removeButton.dataset.removeGrant = uid;
+    removeButton.dataset.grantEmail = email;
+    meta.append(emailNode, expiry);
+    row.append(meta, removeButton);
+    list.appendChild(row);
+  }
+}
+
+$("adminBtn").onclick = async () => {
+  if (normalizeEmail(currentUser?.email) !== ADMIN_EMAIL) return;
+  $("adminFeedback").textContent = "";
+  $("adminMod").classList.add("on");
+  closeSide();
+  try {
+    await renderAdminGrantList();
+  } catch (error) {
+    $("adminFeedback").textContent = "Не удалось загрузить список. Проверьте правила Firebase Database.";
+  }
+};
+
+$("closeAdminBtn").onclick = () => $("adminMod").classList.remove("on");
+$("adminMod").addEventListener("click", e => {
+  if (e.target === $("adminMod")) $("adminMod").classList.remove("on");
+});
+
+$("grantProBtn").onclick = async () => {
+  if (normalizeEmail(currentUser?.email) !== ADMIN_EMAIL) {
+    $("adminFeedback").textContent = "Нет прав администратора.";
+    return;
+  }
+  const email = normalizeEmail($("grantEmail").value);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    $("adminFeedback").textContent = "Введите корректный email.";
+    return;
+  }
+  const button = $("grantProBtn");
+  button.disabled = true;
+  try {
+    const usersSnapshot = await get(ref(database, "venusPro/userIndex"));
+    const users = usersSnapshot.exists() ? usersSnapshot.val() : {};
+    const found = Object.entries(users).find(([, profile]) => normalizeEmail(profile?.email) === email);
+    if (!found) {
+      throw new Error("Этот аккаунт ещё не входил на сайт. Попросите пользователя один раз авторизоваться, затем выдайте Pro.");
+    }
+    const uid = found[0];
+    const now = Date.now();
+    const grant = { email, grantedAt: now, expiresAt: now + PRO_DURATION_MS, grantedBy: ADMIN_EMAIL };
+    await set(ref(database, `venusPro/grants/${uid}`), grant);
+    const cached = getProGrants();
+    cached[email] = grant;
+    saveProGrants(cached);
+    $("grantEmail").value = "";
+    $("adminFeedback").textContent = `Pro выдан для ${email} на 30 дней.`;
+    await renderAdminGrantList();
+    if (normalizeEmail(currentUser?.email) === email) refreshProUI();
+  } catch (error) {
+    $("adminFeedback").textContent = error.message || "Не удалось выдать Pro. Проверьте правила Firebase.";
+  } finally {
+    button.disabled = false;
+  }
+};
+
+$("grantList").addEventListener("click", async e => {
+  const button = e.target.closest("[data-remove-grant]");
+  if (!button || normalizeEmail(currentUser?.email) !== ADMIN_EMAIL) return;
+  button.disabled = true;
+  const uid = button.dataset.removeGrant;
+  const email = button.dataset.grantEmail;
+  try {
+    await remove(ref(database, `venusPro/grants/${uid}`));
+    const cached = getProGrants();
+    delete cached[email];
+    saveProGrants(cached);
+    $("adminFeedback").textContent = `Подписка ${email} отозвана.`;
+    await renderAdminGrantList();
+    if (normalizeEmail(currentUser?.email) === email) refreshProUI();
+  } catch (error) {
+    $("adminFeedback").textContent = "Не удалось отозвать Pro. Проверьте правила Firebase.";
+    button.disabled = false;
+  }
+});
+
+setInterval(() => {
+  const hadPro = !$("proStatus").hidden;
+  const hasPro = refreshProCountdown();
+  if (hadPro !== hasPro) refreshProUI();
+}, 1000);
 
 /* SETTINGS */
 
