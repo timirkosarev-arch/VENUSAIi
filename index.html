@@ -2280,42 +2280,88 @@ $("adminMod").addEventListener("click", e => {
   if (e.target === $("adminMod")) $("adminMod").classList.remove("on");
 });
 
+
 $("grantProBtn").onclick = async () => {
   if (normalizeEmail(currentUser?.email) !== ADMIN_EMAIL) {
     $("adminFeedback").textContent = "Нет прав администратора.";
     return;
   }
+
   const email = normalizeEmail($("grantEmail").value);
+
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     $("adminFeedback").textContent = "Введите корректный email.";
     return;
   }
+
   const button = $("grantProBtn");
   button.disabled = true;
+
+  let step = "Проверка авторизации";
+
   try {
-    const usersSnapshot = await get(ref(database, "venusPro/userIndex"));
-    const users = usersSnapshot.exists() ? usersSnapshot.val() : {};
-    const found = Object.entries(users).find(([, profile]) => normalizeEmail(profile?.email) === email);
+    await auth.currentUser.getIdToken(true);
+
+    step = "Чтение venusPro/userIndex";
+
+    const usersSnapshot = await get(
+      ref(database, "venusPro/userIndex")
+    );
+
+    const users = usersSnapshot.exists()
+      ? usersSnapshot.val()
+      : {};
+
+    const found = Object.entries(users).find(
+      ([, profile]) => normalizeEmail(profile?.email) === email
+    );
+
     if (!found) {
-      throw new Error("Этот аккаунт ещё не входил на сайт. Попросите пользователя один раз авторизоваться, затем выдайте Pro.");
+      throw new Error("Пользователь не найден в userIndex.");
     }
+
     const uid = found[0];
     const now = Date.now();
-    const grant = { email, grantedAt: now, expiresAt: now + PRO_DURATION_MS, grantedBy: ADMIN_EMAIL };
+
+    const grant = {
+      email,
+      grantedAt: now,
+      expiresAt: now + PRO_DURATION_MS,
+      grantedBy: ADMIN_EMAIL
+    };
+
+    step = "Запись venusPro/grants/" + uid;
+
     await set(ref(database, `venusPro/grants/${uid}`), grant);
+
+    step = "Обновление списка подписок";
+
     const cached = getProGrants();
     cached[email] = grant;
     saveProGrants(cached);
+
     $("grantEmail").value = "";
-    $("adminFeedback").textContent = `Pro выдан для ${email} на 30 дней.`;
+    $("adminFeedback").textContent =
+      `Pro выдан для ${email} на 30 дней.`;
+
     await renderAdminGrantList();
-    if (normalizeEmail(currentUser?.email) === email) refreshProUI();
+
+    if (normalizeEmail(currentUser?.email) === email) {
+      refreshProUI();
+    }
+
   } catch (error) {
-    $("adminFeedback").textContent = error.message || "Не удалось выдать Pro. Проверьте правила Firebase.";
+    console.error("VENUS PRO ERROR:", step, error);
+
+    $("adminFeedback").textContent =
+      "Ошибка на этапе: " + step +
+      " | " + (error.code || error.message);
+
   } finally {
     button.disabled = false;
   }
 };
+
 
 $("grantList").addEventListener("click", async e => {
   const button = e.target.closest("[data-remove-grant]");
