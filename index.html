@@ -8,6 +8,7 @@
 <meta property="og:image" content="https://i.ibb.co.com/PzWLhSZL/AI-png.jpg">
 <script>try{document.documentElement.dataset.theme=localStorage.getItem("venus_theme_v2")||"light"}catch(e){document.documentElement.dataset.theme="light"}</script>
 <title>Venus AI</title>
+<meta name="venus-build" content="lines-timeout-2026-11-06">
 
 <link rel="icon" href="https://i.ibb.co.com/PzWLhSZL/AI-png.jpg">
 
@@ -337,7 +338,9 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .token-meter {display:flex;align-items:center;gap:6px;padding:6px 11px;border:1px solid var(--line);border-radius:999px;font-size:12px;white-space:nowrap;color:var(--muted);background:var(--panel)}
 .token-meter .ui-icon{width:15px;height:15px;stroke:var(--accent)}
 @media(max-width:720px){.token-meter{padding:6px 8px;font-size:11px}.token-meter .ui-icon{display:none}}
-@media(max-width:385px){.token-meter{max-width:88px;overflow:hidden;text-overflow:ellipsis}.token-meter #tokenCount{overflow:hidden;text-overflow:ellipsis}}
+@media(max-width:720px){.line-meter{padding:6px 8px}}
+@media(max-width:540px){.token-meter,.line-meter{font-size:10px;padding:5px 6px;letter-spacing:-.15px}}
+@media(max-width:385px){.token-meter{max-width:90px;overflow:hidden;text-overflow:ellipsis}.token-meter #tokenCount{overflow:hidden;text-overflow:ellipsis}.line-meter{max-width:67px;overflow:hidden;text-overflow:ellipsis}}
 </style>
 </head>
 
@@ -445,6 +448,10 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
   <div id="tokenMeter" class="token-meter" title="Расход токенов вашего аккаунта в этом браузере. Если API не вернул usage, показывается оценка.">
     <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 10-12h-7l0-8Z"/></svg>
     <span id="tokenCount">0 токенов</span>
+  </div>
+  <div id="lineMeter" class="token-meter line-meter" title="Строки кода в ответах текущего чата (в том числе создаваемый сейчас код).">
+    <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M10 19h4"/></svg>
+    <span id="lineCount">0 строк</span>
   </div>
   <select class="model-select" id="modelSelect" title="Модель Venus AI" aria-label="Выбрать модель">
     <option value="cx/gpt-6-luna">Flash</option>
@@ -1448,6 +1455,7 @@ async function hydrateMessageImages() {
 }
 
 function renderMsgs() {
+  renderLineUsage();
 
   const c=active();
 
@@ -1747,8 +1755,8 @@ function retryMessage(index) {
 const MAX_TOKENS_PER_REQUEST = 30000;
 const MAX_TOTAL_CODE_TOKENS = 30000;
 const MAX_CODE_CONTINUATIONS = 40;
-const STANDARD_CODE_REQUEST_TOKENS = 2048;
-const BACKUP_CODE_REQUEST_TOKENS = 1024;
+const STANDARD_CODE_REQUEST_TOKENS = 1024;
+const BACKUP_CODE_REQUEST_TOKENS = 512;
 
 // Token totals are stored per signed-in account on this browser only.
 // Actual counts come from provider usage; estimates are marked with ≈.
@@ -1769,6 +1777,28 @@ function renderTokenUsage() {
     ", запросов " + Math.round(stats.requests||0)+
     (approximate?". Часть значений оценочная: провайдер не вернул usage.":". Значения получены из ответа API.");
 }
+// Counts only code inside Markdown fenced blocks in the active chat.
+// A live draft can be included without saving or double-counting it.
+function countCodeLines(content) {
+  if(!content || typeof content!=="string")return 0;
+  const parsed=splitCodeArtifacts(content);
+  return parsed.blocks.reduce((total,block)=>{
+    const code=String(block.c||"");
+    if(!code)return total;
+    return total+code.split("\n").length;
+  },0);
+}
+function renderLineUsage(liveDraft="") {
+  const el=$("lineCount");
+  if(!el)return;
+  const chat=active();
+  const saved=(chat?.messages||[]).reduce((total,message)=>
+    total+(message.role==="assistant"?countCodeLines(message.content):0),0);
+  const count=saved+countCodeLines(liveDraft);
+  el.textContent=count.toLocaleString("ru-RU")+" "+(count%10===1&&count%100!==11?"строка":([2,3,4].includes(count%10) && !(count%100>=12&&count%100<=14)?"строки":"строк"));
+  $("lineMeter").title="Строки кода в ответах текущего чата: "+count.toLocaleString("ru-RU")+". Входят незавершённые артефакты. Текст вне блоков кода не учитывается.";
+}
+
 function estimateUsageTokens(content) {
   if(typeof content==="string")return Math.max(1,Math.ceil(new TextEncoder().encode(content).length/3.5));
   if(Array.isArray(content))return content.reduce((n,part)=>n+estimateUsageTokens(part?.text || ""),0);
@@ -1977,7 +2007,7 @@ async function requestVisibleCode(messages,model,headers,signal,tokenBudget,upda
   const attempts=[
     Math.min(STANDARD_CODE_REQUEST_TOKENS,tokenBudget),
     Math.min(BACKUP_CODE_REQUEST_TOKENS,tokenBudget),
-    Math.min(1024,tokenBudget)
+    Math.min(384,tokenBudget)
   ].filter((n,i,arr)=>n>0&&arr.indexOf(n)===i);
   let lastError=null;
   for(let i=0;i<attempts.length;i++) {
@@ -2143,14 +2173,14 @@ async function send(text,attachmentsOverride=null) {
         const status=r.status;
         let t="";
         try { t=await r.text(); } catch(e) {}
-        if(codeBuild && [429,502,503,504].includes(status)) {
-          progress(1,"Сервер отвечает медленно. Пробую создать меньшую часть файла.");
+        if([429,502,503,504].includes(status)) {
+          if(codeBuild)progress(1,"Сервер отвечает медленно. Пробую создать меньшую часть файла.");
           const fallback=await requestVisibleCode(
             conversation,selectedModel,requestHeaders,ctrl.signal,
             Math.min(BACKUP_CODE_REQUEST_TOKENS,remainingTokens),
-            detail=>progress(1,detail)
+            detail=>{if(codeBuild)progress(1,detail);}
           );
-          if(!fallback.text.trim()) throw new Error("Модель пока не ответила. Полученный код сохранён.");
+          if(!fallback.text.trim()) throw new Error("Модель пока не ответила. Полученный код сохранён, попробуйте повторить запрос.");
           r=new Response(JSON.stringify({
             choices:[{message:{content:fallback.text},finish_reason:fallback.reason||"stop"}],
             _venusAlreadyCounted:true
@@ -2164,7 +2194,8 @@ async function send(text,attachmentsOverride=null) {
       let currentPart="";
       let lastPaint=0;
       const paint=()=>{
-        if(codeBuild)progress(1,`Код: ≈${estimateOutputTokens(am.content).toLocaleString("ru-RU")} / 30 000 токенов${round?" · автоматически продолжаю":""}`);
+        renderLineUsage(am.content);
+        if(codeBuild)progress(1,`Код: ≈${estimateOutputTokens(am.content).toLocaleString("ru-RU")} / 30 000 токенов · ${countCodeLines(am.content).toLocaleString("ru-RU")} строк${round?" · автоматически продолжаю":""}`);
         else {
           const el=live();
           if(el)el.innerHTML=md(am.content);
