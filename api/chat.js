@@ -15,6 +15,9 @@ const ADMIN_EMAIL = "flexadssq@gmail.com";
 const PRO_MS = 30 * 24 * 60 * 60 * 1000;
 
 const MAX_TOKENS = 30000;
+const MAX_TOKENS_PER_CALL = 3072;
+const REQUEST_DEADLINE_MS = 45000;
+
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_CONTENT_CHARS = 250000;
 const MAX_MESSAGES = 40;
@@ -30,10 +33,10 @@ const normalEmail = value =>
   String(value || "").trim().toLowerCase();
 
 const httpError = (status, message) =>
-  Object.assign(new Error(message), { status });
+  Object.assign(new Error(message), {status});
 
 const sendError = (res, status, message) =>
-  res.status(status).json({ error: message });
+  res.status(status).json({error: message});
 
 function adminApp() {
   const existing = getApps().find(
@@ -87,9 +90,13 @@ function adminApp() {
 }
 
 async function getUser(req) {
-  const auth = String(req.headers.authorization || "");
+  const auth = String(
+    req.headers.authorization || ""
+  );
 
-  const token = auth.match(/^Bearer\s+(.+)$/i)?.[1];
+  const token = auth.match(
+    /^Bearer\s+(.+)$/i
+  )?.[1];
 
   if (!token) {
     throw httpError(
@@ -175,10 +182,13 @@ async function imgBBToDataUrl(imageUrl) {
       headers: {
         Accept: "image/jpeg,image/png,image/webp,image/gif"
       },
-      redirect: "manual"
+      redirect: "manual",
+      signal: AbortSignal.timeout(15000)
     });
 
-    if ([301, 302, 303, 307, 308].includes(response.status)) {
+    if (
+      [301, 302, 303, 307, 308].includes(response.status)
+    ) {
       const location = response.headers.get("location");
 
       if (!location) {
@@ -211,8 +221,9 @@ async function imgBBToDataUrl(imageUrl) {
     }
 
     if (
-      Number(response.headers.get("content-length") || 0) >
-      MAX_IMAGE_BYTES
+      Number(
+        response.headers.get("content-length") || 0
+      ) > MAX_IMAGE_BYTES
     ) {
       throw httpError(
         413,
@@ -233,7 +244,7 @@ async function imgBBToDataUrl(imageUrl) {
 
     try {
       while (true) {
-        const { done, value } = await reader.read();
+        const {done, value} = await reader.read();
 
         if (done) break;
 
@@ -349,6 +360,13 @@ export default async function handler(req, res) {
     );
   }
 
+  const deadlineController = new AbortController();
+
+  const deadlineTimer = setTimeout(
+    () => deadlineController.abort(),
+    REQUEST_DEADLINE_MS
+  );
+
   try {
     if (!process.env.API_KEY) {
       throw httpError(
@@ -359,10 +377,9 @@ export default async function handler(req, res) {
 
     const user = await getUser(req);
 
-    const body =
-      typeof req.body === "string"
-        ? JSON.parse(req.body)
-        : req.body;
+    const body = typeof req.body === "string"
+      ? JSON.parse(req.body)
+      : req.body;
 
     if (
       !body ||
@@ -433,10 +450,11 @@ export default async function handler(req, res) {
       Number.isFinite(requestTokens) &&
       requestTokens >= 1
         ? Math.min(
+            MAX_TOKENS_PER_CALL,
             MAX_TOKENS,
             Math.floor(requestTokens)
           )
-        : 8192;
+        : 2048;
 
     const stream = body.stream === true;
 
@@ -459,7 +477,7 @@ export default async function handler(req, res) {
 
     const limits = [
       ...new Set(
-        [maxTokens, 8192, 4096, 2048].filter(
+        [maxTokens, 2048, 1024].filter(
           n => n <= maxTokens
         )
       )
@@ -473,6 +491,7 @@ export default async function handler(req, res) {
       upstream = await fetch(ANYMODEL_URL, {
         method: "POST",
         headers,
+        signal: deadlineController.signal,
         body: JSON.stringify(payload)
       });
 
@@ -493,7 +512,10 @@ export default async function handler(req, res) {
         lastError = String(reason).slice(0, 450);
 
         if (
-          isTokenLimitError(upstream.status, lastError)
+          isTokenLimitError(
+            upstream.status,
+            lastError
+          )
         ) {
           continue;
         }
@@ -526,11 +548,16 @@ export default async function handler(req, res) {
 
         throw httpError(
           502,
-          String(detail || "Ошибка AnyModel.").slice(0, 450)
+          String(
+            detail || "Ошибка AnyModel."
+          ).slice(0, 450)
         );
       }
 
-      res.setHeader("Cache-Control", "no-store");
+      res.setHeader(
+        "Cache-Control",
+        "no-store"
+      );
 
       res.setHeader(
         "Content-Type",
@@ -580,20 +607,49 @@ export default async function handler(req, res) {
     return res.end();
 
   } catch (error) {
+    const timedOut = deadlineController.signal.aborted;
+
+    const status = timedOut
+      ? 503
+      : (error.status || 500);
+
+    const message = timedOut
+      ? "Модель отвечает слишком долго. Повторите запрос меньшей частью."
+      : (
+          error.message ||
+          "Ошибка сервера Venus AI."
+        );
+
     console.error(
       "Venus AI API:",
-      error.status || 500,
-      error.message || "unknown"
+      status,
+      message
     );
 
     if (res.headersSent) {
+      if (
+        (
+          res.getHeader("Content-Type") || ""
+        ).includes("text/event-stream")
+      ) {
+        try {
+          res.write(
+            `data: ${JSON.stringify({
+              error: {message}
+            })}\n\n`
+          );
+        } catch {}
+      }
+
       return res.end();
     }
 
     return sendError(
       res,
-      error.status || 500,
-      error.message || "Ошибка сервера Venus AI."
+      status,
+      message
     );
+  } finally {
+    clearTimeout(deadlineTimer);
   }
 }
