@@ -1828,10 +1828,10 @@ function codeBuildHtml(stage,detail="") {
   </div>`;
 }
 
-async function requestVenusOnce(messages,model,headers,signal,maxTokens=500) {
+async function requestVenusOnce(messages,model,headers,signal) {
   const response=await fetch(API_URL,{
     method:"POST",signal,headers,
-    body:JSON.stringify({model,messages,stream:false,max_tokens:maxTokens})
+    body:JSON.stringify({model,messages,stream:false})
   });
   if(!response.ok) {
     const raw=await response.text().catch(()=>"");
@@ -1933,7 +1933,7 @@ async function send(text,attachmentsOverride=null) {
       // Actual short planning request: no pretend background thinking.
       const plan=await requestVenusOnce(
         [...messages,{role:"user",content:PLAN_FOR_CODE}],
-        selectedModel,requestHeaders,ctrl.signal,380
+        selectedModel,requestHeaders,ctrl.signal
       );
       outputMessages=[...messages,{role:"user",content:finalCodeInstruction(plan.slice(0,1000))}];
       progress(1,"План готов. Формирую исходные файлы без сокращений.");
@@ -1944,7 +1944,9 @@ async function send(text,attachmentsOverride=null) {
     let outputReason=null;
     let interrupted=false;
     let continued=0;
-    const maxRounds=codeBuild?4:3;
+    // Several completions may be needed for big projects; this is a safety cap
+    // on network requests, NOT a cap on generated tokens.
+    const maxRounds=codeBuild?10:5;
     for(let round=0;round<maxRounds;round++) {
       const r=await fetch(API_URL,{
         method:"POST",
@@ -1953,8 +1955,7 @@ async function send(text,attachmentsOverride=null) {
         body:JSON.stringify({
           model:selectedModel,
           messages:conversation,
-          stream:true,
-          max_tokens:8192
+          stream:true
         })
       });
       if(!r.ok) {
@@ -1981,7 +1982,37 @@ async function send(text,attachmentsOverride=null) {
         if(Date.now()-lastPaint>110) { paint();lastPaint=Date.now(); }
       };
       const result=await readVenusResponse(r,addText);
-      if(!currentPart) break;
+      // Some reasoning models return only an empty SSE event. Retry in JSON mode
+      // before showing a misleading "model returned no answer" message.
+      if(!currentPart.trim()) {
+        if(round===0) progress(1,"Потоковый ответ пуст. Повторяю запрос обычным способом.");
+        try {
+          const fallback=await requestVenusOnce(
+            conversation,selectedModel,requestHeaders,ctrl.signal
+          );
+          if(fallback.trim()) addText(fallback);
+        } catch(fallbackError) {
+          if(ctrl.signal.aborted) throw fallbackError;
+          console.warn("Venus AI: empty stream, non-stream retry failed",fallbackError);
+        }
+      }
+      if(!currentPart.trim()) {
+        if(am.content.trim()) {
+          // Preserve already generated code; don't mark it complete.
+          interrupted=true;
+          break;
+        }
+        if(round<2 && round<maxRounds-1) {
+          // A fresh, short instruction can nudge reasoning-only completions
+          // to deliver visible content, without changing the original task.
+          conversation=[...outputMessages,{
+            role:"user",
+            content:"Верни видимый текст ответа и полный код файлов. Не оставляй ответ пустым."
+          }];
+          continue;
+        }
+        throw new Error("Модель вернула пустой ответ после повторных запросов. Попробуйте High или Flash.");
+      }
       outputReason=result.finishReason;
       interrupted=result.interrupted;
       continued=round;
