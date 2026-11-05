@@ -5,18 +5,19 @@ import { getDatabase } from "firebase-admin/database";
 
 const API_URL = "https://anymodel.org/v1/chat/completions";
 
-const MODELS = {
-  flash: "cx/gpt-6-luna",
-  high: "cx/gpt-6.1-sol",
-  astro: "cx/gpt-6-astra"
-};
+const FREE_MODELS = new Set([
+  "cx/gpt-6-luna",
+  "cx/gpt-6.1-sol"
+]);
 
+const PRO_MODEL = "cx/gpt-6-astra";
 const ADMIN_EMAIL = "flexadssq@gmail.com";
 const PRO_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const MAX_MESSAGES = 80;
-const MAX_CONTENT_CHARS = 1000000;
+const MAX_MESSAGES = 40;
+const MAX_CONTENT_CHARS = 250000;
+const MAX_OUTPUT_TOKENS = 30000;
 
 const ALLOWED_IMAGE_TYPES = new Set([
   "image/jpeg",
@@ -47,7 +48,7 @@ function getFirebaseAdminApp() {
       serviceAccount = JSON.parse(
         process.env.FIREBASE_SERVICE_ACCOUNT_JSON
       );
-    } catch {
+    } catch (error) {
       throw new Error(
         "FIREBASE_SERVICE_ACCOUNT_JSON содержит некорректный JSON."
       );
@@ -58,13 +59,15 @@ function getFirebaseAdminApp() {
     const privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
     if (!projectId || !clientEmail || !privateKey) {
-      throw new Error("Firebase Admin не настроен.");
+      throw new Error(
+        "Настройте FIREBASE_SERVICE_ACCOUNT_JSON либо FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL и FIREBASE_PRIVATE_KEY."
+      );
     }
 
     serviceAccount = {
       project_id: projectId,
       client_email: clientEmail,
-      private_key: privateKey
+      private_key: privateKey.replace(/\\n/g, "\n")
     };
   }
 
@@ -76,7 +79,9 @@ function getFirebaseAdminApp() {
   const databaseURL = process.env.FIREBASE_DATABASE_URL;
 
   if (!databaseURL) {
-    throw new Error("FIREBASE_DATABASE_URL не настроен.");
+    throw new Error(
+      "Не задан FIREBASE_DATABASE_URL для Firebase Realtime Database."
+    );
   }
 
   return initializeApp({
@@ -96,41 +101,43 @@ function getBearerToken(req) {
   return match ? match[1].trim() : "";
 }
 
-async function verifyUser(req) {
+async function requireActivePro(req) {
   const token = getBearerToken(req);
 
   if (!token) {
-    const error = new Error("Войдите в аккаунт Venus AI.");
-    error.statusCode = 401;
-    throw error;
-  }
-
-  const app = getFirebaseAdminApp();
-
-  try {
-    return await getAuth(app).verifyIdToken(token, true);
-  } catch {
     const error = new Error(
-      "Сессия истекла. Войдите в аккаунт заново."
+      "Для GPT-6 ASTRO войдите в аккаунт с активной подпиской Pro."
     );
     error.statusCode = 401;
     throw error;
   }
-}
 
-async function requireActivePro(user) {
-  const email = normalizeEmail(user.email);
+  const app = getFirebaseAdminApp();
 
-  if (!user.uid || !email) {
-    const error = new Error("Не удалось определить аккаунт.");
+  let decoded;
+
+  try {
+    decoded = await getAuth(app).verifyIdToken(token, true);
+  } catch (error) {
+    const authError = new Error(
+      "Не удалось подтвердить вход. Войдите в аккаунт заново."
+    );
+    authError.statusCode = 401;
+    throw authError;
+  }
+
+  const email = normalizeEmail(decoded.email);
+
+  if (!decoded.uid || !email) {
+    const error = new Error(
+      "В токене Firebase отсутствует email аккаунта."
+    );
     error.statusCode = 403;
     throw error;
   }
 
-  const app = getFirebaseAdminApp();
-
   const snapshot = await getDatabase(app)
-    .ref(`venusPro/grants/${user.uid}`)
+    .ref(`venusPro/grants/${decoded.uid}`)
     .get();
 
   const grant = snapshot.exists()
@@ -147,18 +154,20 @@ async function requireActivePro(user) {
     normalizeEmail(grant.grantedBy) === ADMIN_EMAIL &&
     Number.isFinite(grantedAt) &&
     Number.isFinite(expiresAt) &&
-    grantedAt <= now + 300000 &&
+    grantedAt <= now + 5 * 60 * 1000 &&
     expiresAt > now &&
     expiresAt > grantedAt &&
-    expiresAt - grantedAt <= PRO_DURATION_MS + 300000;
+    expiresAt - grantedAt <= PRO_DURATION_MS + 5 * 60 * 1000;
 
   if (!validGrant) {
     const error = new Error(
-      "Для GPT-6 ASTRO требуется активная подписка Pro."
+      "У этого аккаунта нет активной подписки Pro."
     );
     error.statusCode = 403;
     throw error;
   }
+
+  return decoded;
 }
 
 function isImgBBHost(hostname) {
@@ -176,7 +185,7 @@ async function fetchImgBBAsDataUrl(sourceUrl) {
 
   try {
     parsed = new URL(sourceUrl);
-  } catch {
+  } catch (_) {
     throw new Error("Некорректная ссылка на изображение.");
   }
 
@@ -184,53 +193,35 @@ async function fetchImgBBAsDataUrl(sourceUrl) {
     parsed.protocol !== "https:" ||
     !isImgBBHost(parsed.hostname)
   ) {
-    throw new Error("Разрешены только ссылки ImgBB.");
+    throw new Error(
+      "Для фото разрешены только прямые ссылки ImgBB."
+    );
   }
 
-  let currentUrl = parsed.toString();
-  let response;
-
-  for (let i = 0; i < 5; i++) {
-    const current = new URL(currentUrl);
-
-    if (
-      current.protocol !== "https:" ||
-      !isImgBBHost(current.hostname)
-    ) {
-      throw new Error("Недопустимый адрес изображения.");
-    }
-
-    response = await fetch(currentUrl, {
-      headers: {
-        Accept: "image/jpeg,image/png,image/webp,image/gif"
-      },
-      redirect: "manual"
-    });
-
-    if (
-      response.status >= 300 &&
-      response.status < 400
-    ) {
-      const location = response.headers.get("location");
-
-      if (!location) {
-        throw new Error("Некорректное перенаправление ImgBB.");
-      }
-
-      currentUrl = new URL(location, currentUrl).toString();
-      continue;
-    }
-
-    break;
-  }
-
-  if (!response || response.status >= 300 && response.status < 400) {
-    throw new Error("Слишком много перенаправлений ImgBB.");
-  }
+  const response = await fetch(parsed.toString(), {
+    method: "GET",
+    headers: {
+      Accept: "image/jpeg,image/png,image/webp,image/gif"
+    },
+    redirect: "follow"
+  });
 
   if (!response.ok) {
     throw new Error(
-      `Не удалось загрузить изображение (${response.status}).`
+      `ImgBB не отдал изображение (HTTP ${response.status}).`
+    );
+  }
+
+  const finalUrl = new URL(
+    response.url || parsed.toString()
+  );
+
+  if (
+    finalUrl.protocol !== "https:" ||
+    !isImgBBHost(finalUrl.hostname)
+  ) {
+    throw new Error(
+      "ImgBB перенаправил запрос на неизвестный адрес."
     );
   }
 
@@ -239,7 +230,9 @@ async function fetchImgBBAsDataUrl(sourceUrl) {
   ).split(";")[0].trim().toLowerCase();
 
   if (!ALLOWED_IMAGE_TYPES.has(contentType)) {
-    throw new Error("Неподдерживаемый формат изображения.");
+    throw new Error(
+      `ImgBB вернул неподдерживаемый тип файла: ${contentType || "неизвестно"}.`
+    );
   }
 
   const declaredLength = Number(
@@ -247,11 +240,15 @@ async function fetchImgBBAsDataUrl(sourceUrl) {
   );
 
   if (declaredLength > MAX_IMAGE_BYTES) {
-    throw new Error("Изображение превышает 5 МБ.");
+    throw new Error(
+      "Изображение слишком большое (лимит 5 МБ)."
+    );
   }
 
   if (!response.body) {
-    throw new Error("Изображение пустое.");
+    throw new Error(
+      "Не удалось получить содержимое изображения."
+    );
   }
 
   const reader = response.body.getReader();
@@ -268,7 +265,10 @@ async function fetchImgBBAsDataUrl(sourceUrl) {
 
       if (total > MAX_IMAGE_BYTES) {
         await reader.cancel();
-        throw new Error("Изображение превышает 5 МБ.");
+
+        throw new Error(
+          "Изображение слишком большое (лимит 5 МБ)."
+        );
       }
 
       chunks.push(Buffer.from(value));
@@ -278,7 +278,9 @@ async function fetchImgBBAsDataUrl(sourceUrl) {
   }
 
   if (!total) {
-    throw new Error("ImgBB вернул пустое изображение.");
+    throw new Error(
+      "ImgBB вернул пустое изображение."
+    );
   }
 
   return (
@@ -298,14 +300,19 @@ function validateDataImage(dataUrl) {
     ? "image/jpeg"
     : match[1].toLowerCase();
 
-  if (!ALLOWED_IMAGE_TYPES.has(mime)) return false;
+  if (!ALLOWED_IMAGE_TYPES.has(mime)) {
+    return false;
+  }
 
-  const bytes = Buffer.from(
+  const estimatedBytes = Buffer.from(
     match[2],
     "base64"
   ).byteLength;
 
-  return bytes > 0 && bytes <= MAX_IMAGE_BYTES;
+  return (
+    estimatedBytes > 0 &&
+    estimatedBytes <= MAX_IMAGE_BYTES
+  );
 }
 
 async function normalizeContent(content) {
@@ -328,6 +335,7 @@ async function normalizeContent(content) {
         type: "text",
         text: part.text.slice(0, MAX_CONTENT_CHARS)
       });
+
       continue;
     }
 
@@ -382,7 +390,7 @@ export default async function handler(req, res) {
     return jsonError(
       res,
       500,
-      "API_KEY не настроен в Vercel."
+      "API_KEY не настроен в Vercel Environment Variables"
     );
   }
 
@@ -403,24 +411,37 @@ export default async function handler(req, res) {
       );
     }
 
-    const requestedModel = String(body.model || "");
+    const model = typeof body.model === "string"
+      ? body.model
+      : "";
 
-    const model =
-      MODELS[requestedModel] ||
-      requestedModel;
-
-    if (!Object.values(MODELS).includes(model)) {
+    if (
+      !FREE_MODELS.has(model) &&
+      model !== PRO_MODEL
+    ) {
       return jsonError(
         res,
         400,
-        "Неизвестная модель."
+        "Неизвестная модель. Выбери Flash, High или Pro High."
       );
     }
 
-    const user = await verifyUser(req);
+    if (model === PRO_MODEL) {
+      try {
+        await requireActivePro(req);
+      } catch (error) {
+        console.warn(
+          "Pro access denied:",
+          error.message
+        );
 
-    if (model === MODELS.astro) {
-      await requireActivePro(user);
+        return jsonError(
+          res,
+          error.statusCode || 503,
+          error.message ||
+            "Не удалось проверить подписку Pro."
+        );
+      }
     }
 
     if (
@@ -430,18 +451,19 @@ export default async function handler(req, res) {
       return jsonError(
         res,
         400,
-        "Нет сообщений для отправки."
+        "Нет сообщений для отправки"
       );
     }
 
     const messages = [];
 
     const validMessages = body.messages
-      .filter(message =>
-        message &&
-        ["system", "user", "assistant"].includes(
-          message.role
-        )
+      .filter(
+        message =>
+          message &&
+          ["system", "user", "assistant"].includes(
+            message.role
+          )
       )
       .slice(-MAX_MESSAGES);
 
@@ -460,40 +482,92 @@ export default async function handler(req, res) {
 
     if (
       !messages.length ||
-      !messages.some(message => message.role === "user")
+      !messages.some(
+        message => message.role === "user"
+      )
     ) {
       return jsonError(
         res,
         400,
-        "Нет корректных сообщений пользователя."
+        "Нет корректных сообщений пользователя"
       );
     }
 
-    const stream = body.stream !== false;
+    // Лимит до 30 000 выходных токенов на запрос.
+    // Реальное ограничение зависит от модели.
 
-    // Искусственный лимит токенов не задаётся.
-    // Ограничения самой модели и провайдера остаются.
+    const requestedTokens = Number(body.max_tokens);
+
+    const maxTokens =
+      Number.isFinite(requestedTokens) &&
+      requestedTokens > 0
+        ? Math.min(
+            MAX_OUTPUT_TOKENS,
+            Math.floor(requestedTokens)
+          )
+        : MAX_OUTPUT_TOKENS;
+
     const requestBody = {
       model,
       messages,
-      stream
+      stream: body.stream !== false,
+      max_tokens: maxTokens
     };
 
-    const upstream = await fetch(API_URL, {
+    const upstreamHeaders = {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      Accept: requestBody.stream
+        ? "text/event-stream"
+        : "application/json"
+    };
+
+    let upstream = await fetch(API_URL, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        Accept: stream
-          ? "text/event-stream"
-          : "application/json"
-      },
+      headers: upstreamHeaders,
       body: JSON.stringify(requestBody)
     });
 
+    // Если модель не поддерживает 30K,
+    // пробуем 8192, затем 4096 токенов.
+
+    for (const smallerLimit of [8192, 4096]) {
+      if (
+        upstream.ok ||
+        requestBody.max_tokens <= smallerLimit
+      ) {
+        break;
+      }
+
+      if (
+        ![400, 422].includes(upstream.status)
+      ) {
+        break;
+      }
+
+      const detail = await upstream.text();
+
+      if (
+        !/(?:max[_ -]?(?:completion[_ -]?)?tokens?|output.{0,20}tokens?|tokens?.{0,20}limit|context.{0,20}length)/i.test(detail)
+      ) {
+        return jsonError(
+          res,
+          502,
+          `AnyModel API ${upstream.status}: ${detail.slice(0, 700)}`
+        );
+      }
+
+      requestBody.max_tokens = smallerLimit;
+
+      upstream = await fetch(API_URL, {
+        method: "POST",
+        headers: upstreamHeaders,
+        body: JSON.stringify(requestBody)
+      });
+    }
+
     if (!upstream.ok) {
       const rawError = await upstream.text();
-
       let detail = rawError;
 
       try {
@@ -503,10 +577,10 @@ export default async function handler(req, res) {
           parsed.error?.message ||
           parsed.message ||
           rawError;
-      } catch {}
+      } catch (_) {}
 
       console.error(
-        "AnyModel error:",
+        "AnyModel API error:",
         upstream.status,
         detail.slice(0, 1000)
       );
@@ -561,7 +635,8 @@ export default async function handler(req, res) {
 
     res.setHeader(
       "Content-Type",
-      contentType || "application/json; charset=utf-8"
+      contentType ||
+        "application/json; charset=utf-8"
     );
 
     res.setHeader(
@@ -572,7 +647,10 @@ export default async function handler(req, res) {
     return res.end(result);
 
   } catch (error) {
-    console.error("Venus AI API error:", error);
+    console.error(
+      "Venus AI API error:",
+      error
+    );
 
     if (res.headersSent) {
       return res.end();
@@ -580,8 +658,8 @@ export default async function handler(req, res) {
 
     return jsonError(
       res,
-      error.statusCode || 500,
-      error.message || "Внутренняя ошибка API."
+      500,
+      error?.message || "Внутренняя ошибка API"
     );
   }
 }
