@@ -8,7 +8,7 @@
 <meta property="og:image" content="https://i.ibb.co.com/PzWLhSZL/AI-png.jpg">
 <script>try{document.documentElement.dataset.theme=localStorage.getItem("venus_theme_v2")||"light"}catch(e){document.documentElement.dataset.theme="light"}</script>
 <title>Venus AI</title>
-<meta name="venus-build" content="opus-5-5-30k-2026-11-06">
+<meta name="venus-build" content="lines-timeout-2026-11-06">
 
 <link rel="icon" href="https://i.ibb.co.com/PzWLhSZL/AI-png.jpg">
 
@@ -329,6 +329,9 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .code-build-step.active .indicator{background:var(--accent);border-color:var(--accent);color:#fff;animation:codePulse 1.1s infinite alternate}
 .code-build-step.done .indicator{background:color-mix(in srgb,var(--accent) 12%,var(--panel));color:var(--accent);border-color:transparent}
 .code-build-detail{margin-top:11px;color:var(--muted);font-size:11px;line-height:1.5;overflow-wrap:anywhere}
+.code-draft-private{padding:15px 16px;border-radius:14px;border:1px solid var(--line);background:var(--panel);color:var(--text);font-size:13px;line-height:1.6}
+.code-draft-private strong{display:block;font-size:13px;margin-bottom:5px}
+.code-draft-private small{display:block;color:var(--muted);font-size:11px}
 @keyframes codePulse{from{opacity:.55}to{opacity:1}}
 .code-build-result{margin:8px 0 0;border-radius:10px;background:color-mix(in srgb,var(--accent) 7%,var(--panel));padding:8px 11px;font-size:11.5px;color:var(--accent)}
 .message-actions [data-download-project]{color:var(--accent);font-weight:710;border:1px solid color-mix(in srgb,var(--accent) 30%,var(--line));padding:6px 10px;background:color-mix(in srgb,var(--accent) 7%,var(--bg))}
@@ -456,7 +459,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
   <select class="model-select" id="modelSelect" title="Модель Venus AI" aria-label="Выбрать модель">
     <option value="cx/gpt-6-luna">Flash</option>
     <option value="cx/gpt-6-sol">High</option>
-    <option id="proModelOption" value="cc/claude-opus-5-5" hidden>Pro High — Claude Opus 5.5</option>
+    <option id="proModelOption" value="cx/gpt-6-astra" hidden>Pro High — ASTRO</option>
   </select>
   <div class="top-right">
     <button class="top-new" id="topNewBtn" type="button" title="Новый чат" aria-label="Новый чат"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L10 16l-4 1 1-4Z"/><path d="M4 4h7M4 4v16h16v-7"/></svg></button>
@@ -519,7 +522,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 <div class="mod" id="proMod">
   <div class="card pro-card">
     <div class="pro-kicker">VENUS AI PRO</div>
-    <h2>Claude Opus 5.5</h2>
+    <h2>GPT-6 ASTRO</h2>
     <p class="pro-description">Доступ к модели Pro High на 30 дней.</p>
     <div class="pro-price-line">
       <span class="old-price">$20</span>
@@ -663,7 +666,7 @@ const DEFAULT_SYS = `Ты Venus AI — сильный и практичный И
 const MODELS = {
   flash: "cx/gpt-6-luna",
   high: "cx/gpt-6-sol",
-  pro: "cc/claude-opus-5-5"
+  pro: "cx/gpt-6-astra"
 };
 
 const ADMIN_EMAIL = "flexadssq@gmail.com";
@@ -1065,12 +1068,10 @@ onAuthStateChanged(auth,user => {
     : savedSystem;
   if (!savedSystem || savedSystem === LEGACY_DEFAULT_SYS) saveSystem();
 
-  const savedModel = store.get(modelKey(settingsId),MODELS.flash);
-  const selectedModel = savedModel === "cx/gpt-6-astra" ? MODELS.pro : savedModel;
+  const selectedModel = store.get(modelKey(settingsId),MODELS.flash);
   $("modelSelect").value = ALL_MODEL_VALUES.has(selectedModel)
     ? selectedModel
     : MODELS.flash;
-  if (selectedModel !== savedModel) store.set(modelKey(settingsId), selectedModel);
 
   $("accountName").textContent = user
     ? (user.displayName || "Пользователь")
@@ -1426,7 +1427,9 @@ function msgHTML(m,index) {
     <div class="row">
       <div class="av"></div>
       <div class="bub">
-        ${md(m.content || "", !!m.truncated && !m.codeBuild)}
+        ${m.codeBuild && (m.truncated || m.resuming)
+          ? `<div class="code-draft-private"><strong>${m.resuming?"Продолжаю создание файлов":"Черновик кода сохранён"}</strong><small>Код пока скрыт · ≈${estimateOutputTokens(m.content||"").toLocaleString("ru-RU")} токенов · ${countCodeLines(m.content||"").toLocaleString("ru-RU")} строк. ${m.resuming?"Собираю полный файл.":"Для завершения нажмите «Продолжить генерацию»."}</small></div>`
+          : md(m.content || "", !!m.truncated && !m.codeBuild)}
         ${m.codeBuild && m.resuming ? '<div class="code-build-result">Дополняю код и проверяю результат…</div>' : ''}
         ${m.truncated && m.codeBuild && !m.resuming ? `<div class="code-build-result">${m.tokenBudgetHit ? "Достигнут предел 30 000 токенов для одного проекта. Можно создать более компактную версию." : "Код сохранён. Можно продолжить генерацию с места остановки."}${m.resumeError ? " " + esc(m.resumeError) : ""}</div>` : ''}
         ${m.truncated && !m.codeBuild ? '<div class="code-build-result">Ответ прервался. Попробуйте повторить запрос.</div>' : ''}
@@ -1753,16 +1756,33 @@ function retryMessage(index) {
 
 /* Output budgets. Token counts here are approximate: exact tokenization
  * depends on AnyModel's underlying model, which is not exposed to the page.
- * 30,000 is the allowed ceiling; normal requests use shorter chunks to avoid timeouts. */
+ * 30,000 is also passed to the backend as max_tokens per request. */
 const MAX_TOKENS_PER_REQUEST = 30000;
 const MAX_TOTAL_CODE_TOKENS = 30000;
-const STANDARD_CHAT_REQUEST_TOKENS = 3072; // Short chunks reduce Vercel 503/504 risk.
 const MAX_CODE_CONTINUATIONS = 40;
 const STANDARD_CODE_REQUEST_TOKENS = 1024;
 const BACKUP_CODE_REQUEST_TOKENS = 512;
 
 // Token totals are stored per signed-in account on this browser only.
 // Actual counts come from provider usage; estimates are marked with ≈.
+// Live tokens are PREVIEW ONLY: they are never saved until the provider replies.
+let liveTokenPreview=null;
+function beginLiveTokenPreview() {
+  liveTokenPreview={uid:currentUser?.uid||"guest",completion:0};
+  renderTokenUsage();
+}
+function updateLiveTokenPreview(text) {
+  if(!liveTokenPreview || liveTokenPreview.uid !== (currentUser?.uid||"guest"))return;
+  const n=estimateUsageTokens(text);
+  if(n===liveTokenPreview.completion)return;
+  liveTokenPreview.completion=n;
+  renderTokenUsage();
+}
+function endLiveTokenPreview() {
+  if(!liveTokenPreview)return;
+  liveTokenPreview=null;
+  renderTokenUsage();
+}
 function tokenStatsKey() { return "venus_token_stats_v2_" + (currentUser?.uid || "guest"); }
 function tokenStats() {
   const stats=store.get(tokenStatsKey(), {prompt:0,completion:0,requests:0,estimatedRequests:0});
@@ -1770,15 +1790,19 @@ function tokenStats() {
 }
 function renderTokenUsage() {
   const stats=tokenStats();
-  const total=(Number(stats.prompt)||0)+(Number(stats.completion)||0);
-  const approximate=(Number(stats.estimatedRequests)||0)>0;
+  const preview=liveTokenPreview?.uid === (currentUser?.uid||"guest") ? liveTokenPreview : null;
+  const confirmed=(Number(stats.prompt)||0)+(Number(stats.completion)||0);
+  const total=confirmed+(preview?.completion||0);
+  const approximate=(Number(stats.estimatedRequests)||0)>0 || !!preview;
   const el=$("tokenCount");
   if(!el)return;
   el.textContent=(approximate?"≈":"")+Math.round(total).toLocaleString("ru-RU")+" токенов";
-  $("tokenMeter").title="Токены в этом браузере: вход " + Math.round(stats.prompt||0).toLocaleString("ru-RU")+
+  $("tokenMeter").title="Уже учтено: " + Math.round(confirmed).toLocaleString("ru-RU") +
+    " (вход " + Math.round(stats.prompt||0).toLocaleString("ru-RU")+
     ", выход " + Math.round(stats.completion||0).toLocaleString("ru-RU") +
-    ", запросов " + Math.round(stats.requests||0)+
-    (approximate?". Часть значений оценочная: провайдер не вернул usage.":". Значения получены из ответа API.");
+    "); запросов " + Math.round(stats.requests||0)+
+    (preview?". Сейчас создаётся код: предварительная оценка полученных токенов ответа +"+Math.round(preview.completion).toLocaleString("ru-RU")+"; после ответа число будет сверено с usage API.":"")+
+    ((Number(stats.estimatedRequests)||0)>0?". Часть значений приблизительная.":"");
 }
 // Counts only code inside Markdown fenced blocks in the active chat.
 // A live draft can be included without saving or double-counting it.
@@ -1808,6 +1832,8 @@ function estimateUsageTokens(content) {
   return 0;
 }
 function addTokenUsage(usage,messages,output) {
+  // Convert the temporary streaming estimate into one confirmed request entry.
+  liveTokenPreview=null;
   const values=usage && typeof usage==="object" ? usage : null;
   const knownPrompt=Number(values?.prompt_tokens);
   const knownCompletion=Number(values?.completion_tokens);
@@ -2090,7 +2116,7 @@ async function send(text,attachmentsOverride=null) {
   renderList();
   renderMsgs();
 
-  const am={role:"assistant",content:""};
+  const am={role:"assistant",content:"",codeBuild};
   $("wrap").insertAdjacentHTML("beforeend",`
     <div class="row" id="live">
       <div class="av"></div>
@@ -2152,11 +2178,12 @@ async function send(text,attachmentsOverride=null) {
     for(let round=0;round<maxRounds;round++) {
       const remainingTokens=codeBuild
         ? MAX_TOTAL_CODE_TOKENS-estimateOutputTokens(am.content)
-        : MAX_TOKENS_PER_REQUEST-estimateOutputTokens(am.content);
-      if(remainingTokens<=0) {budgetHit=true;break;}
+        : MAX_TOKENS_PER_REQUEST;
+      if(codeBuild && remainingTokens<=0) {budgetHit=true;break;}
       const responseTokenLimit=codeBuild
         ? Math.min(STANDARD_CODE_REQUEST_TOKENS,Math.max(1,remainingTokens))
-        : Math.min(STANDARD_CHAT_REQUEST_TOKENS,Math.max(1,remainingTokens));
+        : Math.min(MAX_TOKENS_PER_REQUEST,Math.max(1,remainingTokens));
+      if(codeBuild)beginLiveTokenPreview();
       const attemptController=new AbortController();
       const abortAttempt=()=>attemptController.abort();
       ctrl.signal.addEventListener("abort",abortAttempt,{once:true});
@@ -2168,7 +2195,9 @@ async function send(text,attachmentsOverride=null) {
         body:JSON.stringify({
           model:selectedModel,
           messages:conversation,
-          stream:!codeBuild,
+          // Stream generated code into memory, not into the chat message.
+          // This makes the token meter advance as actual fragments arrive.
+          stream:true,
           max_tokens:responseTokenLimit
         })
       });
@@ -2177,7 +2206,10 @@ async function send(text,attachmentsOverride=null) {
         let t="";
         try { t=await r.text(); } catch(e) {}
         if([429,502,503,504].includes(status)) {
-          if(codeBuild)progress(1,"Сервер отвечает медленно. Пробую создать меньшую часть файла.");
+          if(codeBuild) {
+            endLiveTokenPreview();
+            progress(1,"Сервер отвечает медленно. Пробую создать меньшую часть файла.");
+          }
           const fallback=await requestVisibleCode(
             conversation,selectedModel,requestHeaders,ctrl.signal,
             Math.min(BACKUP_CODE_REQUEST_TOKENS,remainingTokens),
@@ -2228,8 +2260,11 @@ async function send(text,attachmentsOverride=null) {
           currentPart=proposedPart;
           am.content=proposedAll;
         }
-        // Full Markdown parsing on each token freezes mobile browsers for long files.
-        if(Date.now()-lastPaint>110) { paint();lastPaint=Date.now(); }
+        // Never reveal partial code; show progress and an honest live estimate.
+        if(Date.now()-lastPaint>140) {
+          if(codeBuild)updateLiveTokenPreview(currentPart);
+          paint();lastPaint=Date.now();
+        }
       };
       let result;
       try {
@@ -2240,6 +2275,7 @@ async function send(text,attachmentsOverride=null) {
       } finally {
         ctrl.signal.removeEventListener("abort",abortAttempt);
       }
+      if(codeBuild)endLiveTokenPreview();
       if(!result.alreadyCounted)addTokenUsage(result.usage,conversation,currentPart);
       if(budgetHit) {outputReason="budget";interrupted=true;paint();break;}
       // Some reasoning models return only an empty SSE event. Retry in JSON mode
@@ -2364,9 +2400,12 @@ async function send(text,attachmentsOverride=null) {
     if(!am.content && live()) live().innerHTML="<span>Модель не вернула ответ.</span>";
 
   } catch(e) {
+    if(codeBuild)endLiveTokenPreview();
     if(e.name==="AbortError") {
-      if(am.content)c.messages.push(am);
-      else if($("live"))$("live").remove();
+      if(am.content) {
+        if(codeBuild)am.truncated=true;
+        if(!c.messages.includes(am))c.messages.push(am);
+      } else if($("live"))$("live").remove();
     } else {
       if(am.content) {
         am.truncated=true;
@@ -2376,9 +2415,12 @@ async function send(text,attachmentsOverride=null) {
       const hint=e.message==="Failed to fetch"
         ? "Не удалось подключиться к серверу. Проверьте API и интернет."
         : e.message;
-      if(live())live().innerHTML=am.content
-        ? md(am.content)+`<div class="err">Ответ прерван: ${esc(hint)}. Полученный код сохранён, но может быть неполным.</div>`
-        : `<div class="err">${esc(hint)}</div>`;
+      if(codeBuild)am.resumeError=hint;
+      if(live())live().innerHTML=codeBuild && am.content
+        ? codeBuildHtml(1,"Создание прервалось. Черновик сохранён и скрыт; его можно продолжить.")
+        : am.content
+          ? md(am.content)+`<div class="err">Ответ прерван: ${esc(hint)}. Полученный код сохранён, но может быть неполным.</div>`
+          : `<div class="err">${esc(hint)}</div>`;
     }
   }
 
