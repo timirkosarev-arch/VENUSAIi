@@ -3,24 +3,22 @@ import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getDatabase } from "firebase-admin/database";
 
-const ANYMODEL_URL = "https://anymodel.org/v1/chat/completions";
+const API_URL = "https://anymodel.org/v1/chat/completions";
 
-const MODELS = Object.freeze({
+const MODELS = {
   flash: "cx/gpt-6-luna",
   high: "cx/gpt-6-sol",
   astro: "cx/gpt-6-astra"
-});
+};
 
 const ADMIN_EMAIL = "flexadssq@gmail.com";
 const PRO_MS = 30 * 24 * 60 * 60 * 1000;
 
-const MAX_TOKENS = 30000;
-const MAX_TOKENS_PER_CALL = 3072;
-const REQUEST_DEADLINE_MS = 45000;
-
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const MAX_CONTENT_CHARS = 250000;
+const TOTAL_TIMEOUT_MS = 23000;
+const MAX_TOKENS_PER_CALL = 2048;
 const MAX_MESSAGES = 40;
+const MAX_CONTENT_CHARS = 250000;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const IMAGE_TYPES = new Set([
   "image/jpeg",
@@ -32,23 +30,20 @@ const IMAGE_TYPES = new Set([
 const normalEmail = value =>
   String(value || "").trim().toLowerCase();
 
-const httpError = (status, message) =>
-  Object.assign(new Error(message), {status});
+const fail = (status, message) =>
+  Object.assign(new Error(message), { status });
 
-const sendError = (res, status, message) =>
-  res.status(status).json({error: message});
-
-function adminApp() {
+function getAdminApp() {
   const existing = getApps().find(
     app => app.name === "venus-ai-api"
   );
 
   if (existing) return existing;
 
-  let account;
+  let credentials;
 
   try {
-    account = process.env.FIREBASE_SERVICE_ACCOUNT_JSON
+    credentials = process.env.FIREBASE_SERVICE_ACCOUNT_JSON
       ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON)
       : {
           project_id: process.env.FIREBASE_PROJECT_ID,
@@ -56,81 +51,109 @@ function adminApp() {
           private_key: process.env.FIREBASE_PRIVATE_KEY
         };
   } catch {
-    throw httpError(
+    throw fail(
       500,
       "Некорректный FIREBASE_SERVICE_ACCOUNT_JSON."
     );
   }
 
   if (
-    !account?.project_id ||
-    !account?.client_email ||
-    !account?.private_key
+    !credentials?.project_id ||
+    !credentials?.client_email ||
+    !credentials?.private_key
   ) {
-    throw httpError(
+    throw fail(
       500,
-      "Не настроен Firebase Admin в Vercel."
+      "Firebase Admin не настроен в Vercel."
     );
   }
 
   if (!process.env.FIREBASE_DATABASE_URL) {
-    throw httpError(
+    throw fail(
       500,
-      "Не настроен FIREBASE_DATABASE_URL."
+      "Отсутствует FIREBASE_DATABASE_URL."
     );
   }
 
-  account.private_key =
-    account.private_key.replace(/\\n/g, "\n");
+  credentials.private_key =
+    credentials.private_key.replace(/\\n/g, "\n");
 
   return initializeApp({
-    credential: cert(account),
+    credential: cert(credentials),
     databaseURL: process.env.FIREBASE_DATABASE_URL
   }, "venus-ai-api");
 }
 
-async function getUser(req) {
-  const auth = String(
-    req.headers.authorization || ""
-  );
+function bounded(promise, signal) {
+  if (signal.aborted) {
+    return Promise.reject(
+      fail(503, "Превышено время запроса.")
+    );
+  }
 
-  const token = auth.match(
-    /^Bearer\s+(.+)$/i
-  )?.[1];
+  return new Promise((resolve, reject) => {
+    const onAbort = () => reject(
+      fail(503, "Превышено время запроса.")
+    );
+
+    signal.addEventListener("abort", onAbort, {
+      once: true
+    });
+
+    Promise.resolve(promise)
+      .then(resolve, reject)
+      .finally(() => {
+        signal.removeEventListener("abort", onAbort);
+      });
+  });
+}
+
+async function authenticate(req, signal) {
+  const token = String(
+    req.headers.authorization || ""
+  ).match(/^Bearer\s+(.+)$/i)?.[1];
 
   if (!token) {
-    throw httpError(
+    throw fail(
       401,
       "Войдите в аккаунт Venus AI."
     );
   }
 
   try {
-    return await getAuth(adminApp()).verifyIdToken(
-      token,
-      true
+    return await bounded(
+      getAuth(getAdminApp()).verifyIdToken(token, true),
+      signal
     );
-  } catch {
-    throw httpError(
+  } catch (error) {
+    if (signal.aborted) {
+      throw fail(
+        503,
+        "Проверка Firebase заняла слишком много времени."
+      );
+    }
+
+    throw fail(
       401,
-      "Сессия истекла. Войдите в аккаунт заново."
+      "Сессия Firebase недействительна. Войдите заново."
     );
   }
 }
 
-async function checkPro(user) {
-  const grantSnapshot = await getDatabase(adminApp())
-    .ref(`venusPro/grants/${user.uid}`)
-    .get();
+async function checkPro(user, signal) {
+  const snapshot = await bounded(
+    getDatabase(getAdminApp())
+      .ref(`venusPro/grants/${user.uid}`)
+      .get(),
+    signal
+  );
 
-  const g = grantSnapshot.val();
-  const now = Date.now();
-
+  const g = snapshot.val();
   const start = Number(g?.grantedAt);
   const end = Number(g?.expiresAt);
+  const now = Date.now();
 
-  const valid =
-    g &&
+  const valid = g &&
     normalEmail(g.email) === normalEmail(user.email) &&
     normalEmail(g.grantedBy) === ADMIN_EMAIL &&
     Number.isFinite(start) &&
@@ -141,50 +164,50 @@ async function checkPro(user) {
     end - start <= PRO_MS + 300000;
 
   if (!valid) {
-    throw httpError(
+    throw fail(
       403,
-      "Для GPT-6 ASTRO нужна активная подписка Pro."
+      "Для Pro High нужна активная подписка Pro."
     );
   }
 }
 
-function imgBBHost(host) {
-  return (
-    host === "i.ibb.co" ||
-    host === "i.ibb.co.com"
-  );
+function allowedImageUrl(url) {
+  return url.protocol === "https:" &&
+    ["i.ibb.co", "i.ibb.co.com"].includes(
+      url.hostname.toLowerCase()
+    );
 }
 
-async function imgBBToDataUrl(imageUrl) {
+async function imageToDataUrl(source, signal) {
   let url;
 
   try {
-    url = new URL(imageUrl);
+    url = new URL(source);
   } catch {
-    throw httpError(
+    throw fail(
       400,
-      "Некорректная ссылка на фотографию."
+      "Неверная ссылка на фото."
     );
   }
 
-  for (let redirects = 0; redirects <= 4; redirects++) {
-    if (
-      url.protocol !== "https:" ||
-      !imgBBHost(url.hostname)
-    ) {
-      throw httpError(
+  for (let i = 0; i < 5; i++) {
+    if (!allowedImageUrl(url)) {
+      throw fail(
         400,
-        "Разрешены только прямые HTTPS-ссылки ImgBB."
+        "Разрешены только ссылки ImgBB."
       );
     }
 
-    const response = await fetch(url.href, {
-      headers: {
-        Accept: "image/jpeg,image/png,image/webp,image/gif"
-      },
-      redirect: "manual",
-      signal: AbortSignal.timeout(15000)
-    });
+    const response = await bounded(
+      fetch(url, {
+        redirect: "manual",
+        headers: {
+          Accept: "image/jpeg,image/png,image/webp,image/gif"
+        },
+        signal
+      }),
+      signal
+    );
 
     if (
       [301, 302, 303, 307, 308].includes(response.status)
@@ -192,9 +215,9 @@ async function imgBBToDataUrl(imageUrl) {
       const location = response.headers.get("location");
 
       if (!location) {
-        throw httpError(
+        throw fail(
           400,
-          "ImgBB вернул пустое перенаправление."
+          "ImgBB вернул некорректный редирект."
         );
       }
 
@@ -203,179 +226,217 @@ async function imgBBToDataUrl(imageUrl) {
     }
 
     if (!response.ok) {
-      throw httpError(
+      throw fail(
         502,
-        `ImgBB: HTTP ${response.status}.`
+        `ImgBB HTTP ${response.status}.`
       );
     }
 
     const type = (
       response.headers.get("content-type") || ""
-    ).split(";")[0].toLowerCase();
+    ).split(";")[0].trim();
 
     if (!IMAGE_TYPES.has(type)) {
-      throw httpError(
+      throw fail(
         400,
-        "Неподдерживаемый формат изображения."
+        "Неподдерживаемый тип изображения."
       );
     }
 
     if (
-      Number(
-        response.headers.get("content-length") || 0
-      ) > MAX_IMAGE_BYTES
+      Number(response.headers.get("content-length") || 0) >
+      MAX_IMAGE_BYTES
     ) {
-      throw httpError(
+      throw fail(
         413,
-        "Размер изображения превышает 5 МБ."
+        "Изображение превышает 5 МБ."
       );
     }
 
     if (!response.body) {
-      throw httpError(
+      throw fail(
         502,
-        "ImgBB вернул пустой файл."
+        "ImgBB вернул пустое изображение."
       );
     }
 
     const reader = response.body.getReader();
-    const buffers = [];
-    let size = 0;
+    let total = 0;
+    const chunks = [];
 
     try {
       while (true) {
-        const {done, value} = await reader.read();
+        const { done, value } = await bounded(
+          reader.read(),
+          signal
+        );
 
         if (done) break;
 
-        size += value.length;
+        total += value.byteLength;
 
-        if (size > MAX_IMAGE_BYTES) {
+        if (total > MAX_IMAGE_BYTES) {
           await reader.cancel();
 
-          throw httpError(
+          throw fail(
             413,
-            "Размер изображения превышает 5 МБ."
+            "Изображение превышает 5 МБ."
           );
         }
 
-        buffers.push(Buffer.from(value));
+        chunks.push(Buffer.from(value));
       }
     } finally {
       reader.releaseLock();
     }
 
-    if (!size) {
-      throw httpError(
+    if (!total) {
+      throw fail(
         502,
-        "Пустой файл изображения."
+        "ImgBB вернул пустой файл."
       );
     }
 
     return (
       `data:${type};base64,` +
-      Buffer.concat(buffers).toString("base64")
+      Buffer.concat(chunks).toString("base64")
     );
   }
 
-  throw httpError(
+  throw fail(
     400,
-    "Слишком много перенаправлений ImgBB."
+    "Слишком много редиректов ImgBB."
   );
 }
 
-async function normalizeContent(content) {
+async function cleanContent(content, signal) {
   if (typeof content === "string") {
     return content.slice(0, MAX_CONTENT_CHARS);
   }
 
-  if (!Array.isArray(content)) {
-    return null;
-  }
+  if (!Array.isArray(content)) return null;
 
-  const result = [];
+  const parts = [];
 
   for (const item of content) {
     if (
       item?.type === "text" &&
       typeof item.text === "string"
     ) {
-      result.push({
+      parts.push({
         type: "text",
         text: item.text.slice(0, MAX_CONTENT_CHARS)
       });
-    } else if (
-      item?.type === "image_url" &&
-      typeof item.image_url?.url === "string"
-    ) {
-      let url = item.image_url.url;
 
-      if (url.startsWith("data:")) {
-        const match = url.match(
-          /^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/
-        );
-
-        if (
-          !match ||
-          Buffer.from(match[2], "base64").length >
-            MAX_IMAGE_BYTES
-        ) {
-          throw httpError(
-            400,
-            "Неверное изображение или размер больше 5 МБ."
-          );
-        }
-      } else {
-        url = await imgBBToDataUrl(url);
-      }
-
-      result.push({
-        type: "image_url",
-        image_url: {
-          url,
-          detail: "auto"
-        }
-      });
+      continue;
     }
+
+    if (
+      item?.type !== "image_url" ||
+      typeof item.image_url?.url !== "string"
+    ) {
+      continue;
+    }
+
+    let url = item.image_url.url;
+
+    if (url.startsWith("data:")) {
+      const match = url.match(
+        /^data:(image\/(?:jpeg|png|webp|gif));base64,([a-z0-9+/=]+)$/i
+      );
+
+      if (
+        !match ||
+        Buffer.from(match[2], "base64").length >
+        MAX_IMAGE_BYTES
+      ) {
+        throw fail(
+          400,
+          "Некорректное изображение или размер превышает 5 МБ."
+        );
+      }
+    } else {
+      url = await imageToDataUrl(url, signal);
+    }
+
+    parts.push({
+      type: "image_url",
+      image_url: {
+        url,
+        detail: "auto"
+      }
+    });
   }
 
-  return result.length ? result : null;
+  return parts.length ? parts : null;
 }
 
-function isTokenLimitError(status, message) {
-  return (
-    [400, 422].includes(status) &&
-    /(?:max[_ -]?(?:completion[_ -]?)?tokens?|output.{0,20}tokens?|context.{0,20}length)/i.test(message)
-  );
+function readText(data) {
+  const message = data?.choices?.[0]?.message;
+  const value = message?.content;
+
+  if (typeof value === "string") return value;
+
+  if (Array.isArray(value)) {
+    return value.map(
+      part => part?.text || ""
+    ).join("");
+  }
+
+  return "";
+}
+
+function describeError(error, signal) {
+  if (
+    signal.aborted ||
+    error?.name === "AbortError"
+  ) {
+    return {
+      status: 503,
+      message: "Ответ слишком долгий. Venus AI может повторить запрос меньшей частью."
+    };
+  }
+
+  return {
+    status: error?.status || 500,
+    message: error?.message ||
+      "Ошибка сервера Venus AI."
+  };
 }
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    res.setHeader("Allow", "POST");
-
-    return sendError(
-      res,
-      405,
-      "Метод не поддерживается."
-    );
+  if (req.method === "GET") {
+    return res.status(200).json({
+      ok: true,
+      version: "venus-timeout-fix-2"
+    });
   }
 
-  const deadlineController = new AbortController();
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "GET, POST");
 
-  const deadlineTimer = setTimeout(
-    () => deadlineController.abort(),
-    REQUEST_DEADLINE_MS
+    return res.status(405).json({
+      error: "Method not allowed"
+    });
+  }
+
+  const started = Date.now();
+  const controller = new AbortController();
+
+  const timer = setTimeout(
+    () => controller.abort(),
+    TOTAL_TIMEOUT_MS
   );
+
+  let stage = "start";
 
   try {
     if (!process.env.API_KEY) {
-      throw httpError(
+      throw fail(
         500,
         "API_KEY не настроен в Vercel."
       );
     }
-
-    const user = await getUser(req);
 
     const body = typeof req.body === "string"
       ? JSON.parse(req.body)
@@ -386,34 +447,54 @@ export default async function handler(req, res) {
       typeof body !== "object" ||
       Array.isArray(body)
     ) {
-      throw httpError(
+      throw fail(
         400,
-        "Некорректный запрос."
+        "Некорректное тело запроса."
       );
     }
 
-    const model = MODELS[body.model] || body.model;
+    const aliases = {
+      ...MODELS,
+      "cx/gpt-6.1-sol": MODELS.high
+    };
+
+    const model =
+      aliases[body.model] || body.model;
 
     if (!Object.values(MODELS).includes(model)) {
-      throw httpError(
+      throw fail(
         400,
-        "Неизвестная модель Venus AI."
+        "Неизвестная модель."
       );
     }
 
+    stage = "firebase_auth";
+
+    const user = await authenticate(
+      req,
+      controller.signal
+    );
+
     if (model === MODELS.astro) {
-      await checkPro(user);
+      stage = "pro_check";
+
+      await checkPro(
+        user,
+        controller.signal
+      );
     }
 
     if (
       !Array.isArray(body.messages) ||
-      body.messages.length === 0
+      !body.messages.length
     ) {
-      throw httpError(
+      throw fail(
         400,
-        "Нет сообщений для модели."
+        "Нет сообщений."
       );
     }
+
+    stage = "messages";
 
     const messages = [];
 
@@ -424,10 +505,14 @@ export default async function handler(req, res) {
         continue;
       }
 
-      const content = await normalizeContent(msg.content);
+      const content = await cleanContent(
+        msg.content,
+        controller.signal
+      );
 
       if (
-        content &&
+        content !== null &&
+        content !== "" &&
         (!Array.isArray(content) || content.length)
       ) {
         messages.push({
@@ -438,23 +523,21 @@ export default async function handler(req, res) {
     }
 
     if (!messages.some(m => m.role === "user")) {
-      throw httpError(
+      throw fail(
         400,
         "Нет сообщения пользователя."
       );
     }
 
-    const requestTokens = Number(body.max_tokens);
+    const requested = Number(body.max_tokens);
 
     const maxTokens =
-      Number.isFinite(requestTokens) &&
-      requestTokens >= 1
+      Number.isFinite(requested) && requested > 0
         ? Math.min(
             MAX_TOKENS_PER_CALL,
-            MAX_TOKENS,
-            Math.floor(requestTokens)
+            Math.floor(requested)
           )
-        : 2048;
+        : MAX_TOKENS_PER_CALL;
 
     const stream = body.stream === true;
 
@@ -473,183 +556,192 @@ export default async function handler(req, res) {
         : "application/json"
     };
 
-    let upstream;
+    stage = "anymodel";
 
-    const limits = [
+    let response;
+    let upstreamError = "";
+
+    for (const limit of [
       ...new Set(
-        [maxTokens, 2048, 1024].filter(
-          n => n <= maxTokens
-        )
+        [maxTokens, 1024, 512].filter(n => n <= maxTokens)
       )
-    ];
-
-    let lastError = "";
-
-    for (const limit of limits) {
+    ]) {
       payload.max_tokens = limit;
 
-      upstream = await fetch(ANYMODEL_URL, {
-        method: "POST",
-        headers,
-        signal: deadlineController.signal,
-        body: JSON.stringify(payload)
-      });
-
-      if (!upstream.ok) {
-        const raw = await upstream.text();
-        let reason = raw;
-
-        try {
-          const data = JSON.parse(raw);
-
-          reason =
-            data.error?.message ||
-            data.error ||
-            data.message ||
-            raw;
-        } catch {}
-
-        lastError = String(reason).slice(0, 450);
-
-        if (
-          isTokenLimitError(
-            upstream.status,
-            lastError
-          )
-        ) {
-          continue;
-        }
-
-        throw httpError(
-          502,
-          `AnyModel ${upstream.status}: ${lastError}`
-        );
-      }
-
-      if (stream) break;
-
-      const raw = await upstream.text();
-      let parsed;
-
-      try {
-        parsed = JSON.parse(raw);
-      } catch {
-        throw httpError(
-          502,
-          "AnyModel вернул некорректный JSON."
-        );
-      }
-
-      if (parsed?.error) {
-        const detail =
-          typeof parsed.error === "string"
-            ? parsed.error
-            : parsed.error.message;
-
-        throw httpError(
-          502,
-          String(
-            detail || "Ошибка AnyModel."
-          ).slice(0, 450)
-        );
-      }
-
-      res.setHeader(
-        "Cache-Control",
-        "no-store"
+      response = await bounded(
+        fetch(API_URL, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        }),
+        controller.signal
       );
+
+      if (response.ok) break;
+
+      upstreamError = (
+        await bounded(
+          response.text(),
+          controller.signal
+        )
+      ).slice(0, 600);
+
+      if (
+        !(
+          [400, 422].includes(response.status) &&
+          /(?:max[_ -]?(?:completion[_ -]?)?tokens?|output.{0,20}tokens?|context.{0,20}length)/i.test(upstreamError)
+        )
+      ) {
+        throw fail(
+          502,
+          `AnyModel HTTP ${response.status}: ${upstreamError}`
+        );
+      }
+    }
+
+    if (!response?.ok) {
+      throw fail(
+        502,
+        `AnyModel: ${upstreamError || "ошибка модели"}`
+      );
+    }
+
+    const type =
+      response.headers.get("content-type") || "";
+
+    if (
+      stream &&
+      type.includes("text/event-stream") &&
+      response.body
+    ) {
+      stage = "streaming";
+
+      res.statusCode = 200;
 
       res.setHeader(
         "Content-Type",
-        "application/json; charset=utf-8"
-      );
-
-      return res.status(200).send(raw);
-    }
-
-    if (!upstream?.ok || !stream) {
-      throw httpError(
-        502,
-        lastError || "Модель не вернула текст."
-      );
-    }
-
-    res.statusCode = 200;
-
-    res.setHeader(
-      "Content-Type",
-      upstream.headers.get("content-type") ||
         "text/event-stream; charset=utf-8"
-    );
-
-    res.setHeader(
-      "Cache-Control",
-      "no-cache, no-transform"
-    );
-
-    res.setHeader(
-      "X-Accel-Buffering",
-      "no"
-    );
-
-    if (!upstream.body) {
-      throw httpError(
-        502,
-        "Сервер не предоставил поток ответа."
       );
-    }
 
-    for await (const chunk of upstream.body) {
-      if (res.destroyed) break;
-      res.write(chunk);
-    }
+      res.setHeader(
+        "Cache-Control",
+        "no-cache, no-transform"
+      );
 
-    return res.end();
+      res.setHeader(
+        "X-Accel-Buffering",
+        "no"
+      );
 
-  } catch (error) {
-    const timedOut = deadlineController.signal.aborted;
+      try {
+        let sentBytes = 0;
 
-    const status = timedOut
-      ? 503
-      : (error.status || 500);
+        for await (const chunk of response.body) {
+          if (
+            controller.signal.aborted ||
+            res.destroyed
+          ) {
+            break;
+          }
 
-    const message = timedOut
-      ? "Модель отвечает слишком долго. Повторите запрос меньшей частью."
-      : (
-          error.message ||
-          "Ошибка сервера Venus AI."
-        );
+          sentBytes += chunk.byteLength;
+          res.write(chunk);
+        }
 
-    console.error(
-      "Venus AI API:",
-      status,
-      message
-    );
-
-    if (res.headersSent) {
-      if (
-        (
-          res.getHeader("Content-Type") || ""
-        ).includes("text/event-stream")
-      ) {
-        try {
+        if (!sentBytes && !res.destroyed) {
           res.write(
             `data: ${JSON.stringify({
-              error: {message}
+              error: {
+                message: "Модель вернула пустой поток. Повторите запрос."
+              }
             })}\n\n`
           );
-        } catch {}
+        }
+      } catch (error) {
+        const info = describeError(
+          error,
+          controller.signal
+        );
+
+        if (!res.destroyed) {
+          res.write(
+            `data: ${JSON.stringify({
+              error: {
+                message: info.message
+              }
+            })}\n\n`
+          );
+        }
       }
 
       return res.end();
     }
 
-    return sendError(
-      res,
-      status,
-      message
+    stage = "json_response";
+
+    const raw = await bounded(
+      response.text(),
+      controller.signal
     );
+
+    let data;
+
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      throw fail(
+        502,
+        "AnyModel вернул некорректный JSON."
+      );
+    }
+
+    if (data?.error) {
+      throw fail(
+        502,
+        String(
+          data.error.message || data.error
+        ).slice(0, 500)
+      );
+    }
+
+    if (!readText(data).trim()) {
+      throw fail(
+        502,
+        "Модель вернула пустой ответ. Повторите меньшей частью."
+      );
+    }
+
+    res.setHeader(
+      "Cache-Control",
+      "no-store"
+    );
+
+    return res.status(200).json(data);
+
+  } catch (error) {
+    const info = describeError(
+      error,
+      controller.signal
+    );
+
+    console.error("[Venus API]", {
+      stage,
+      elapsedMs: Date.now() - started,
+      status: info.status,
+      message: info.message
+    });
+
+    if (res.headersSent) {
+      return res.end();
+    }
+
+    return res.status(info.status).json({
+      error: info.message,
+      stage
+    });
+
   } finally {
-    clearTimeout(deadlineTimer);
+    clearTimeout(timer);
   }
 }
