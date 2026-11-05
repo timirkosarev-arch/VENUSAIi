@@ -312,6 +312,27 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .response-incomplete{font-size:12px;line-height:1.5;color:#a45d13;margin:10px 0;border:1px solid #e4c28d;border-radius:9px;padding:8px 10px}
 :root[data-theme="dark"] .response-incomplete{color:#f0c17b;border-color:#644c2b}
 
+
+/* Dedicated code-to-file workflow */
+.code-mode{display:inline-flex;gap:6px;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:999px;padding:7px 11px;background:transparent;color:var(--muted);font-size:11.5px;font-weight:640;min-height:33px;white-space:nowrap;transition:background .16s,border-color .16s}
+.code-mode .ui-icon{width:16px;height:16px}
+.code-mode:hover{background:var(--hover);color:var(--text)}
+.code-mode[aria-pressed="true"]{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 48%,var(--line));background:color-mix(in srgb,var(--accent) 9%,var(--panel))}
+.code-build{border:1px solid var(--line);border-radius:16px;padding:15px 17px;max-width:440px;width:min(440px,calc(100vw - 95px));background:var(--panel);box-shadow:var(--shadow)}
+.code-build-head{display:flex;align-items:center;gap:10px;font-weight:700;font-size:13px;margin-bottom:11px}
+.code-build-head .ui-icon{color:var(--accent);width:18px;height:18px}
+.code-build-steps{display:grid;gap:9px}
+.code-build-step{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:12px}
+.code-build-step .indicator{width:17px;height:17px;display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;font-size:10px;flex-shrink:0}
+.code-build-step.active{color:var(--text);font-weight:650}
+.code-build-step.active .indicator{background:var(--accent);border-color:var(--accent);color:#fff;animation:codePulse 1.1s infinite alternate}
+.code-build-step.done .indicator{background:color-mix(in srgb,var(--accent) 12%,var(--panel));color:var(--accent);border-color:transparent}
+.code-build-detail{margin-top:11px;color:var(--muted);font-size:11px;line-height:1.5;overflow-wrap:anywhere}
+@keyframes codePulse{from{opacity:.55}to{opacity:1}}
+.code-build-result{margin:8px 0 0;border-radius:10px;background:color-mix(in srgb,var(--accent) 7%,var(--panel));padding:8px 11px;font-size:11.5px;color:var(--accent)}
+.message-actions [data-download-project]{color:var(--accent);font-weight:710;border:1px solid color-mix(in srgb,var(--accent) 30%,var(--line));padding:6px 10px;background:color-mix(in srgb,var(--accent) 7%,var(--bg))}
+@media(max-width:600px){.attach-caption{display:none}.composer-left{gap:7px}.code-mode{font-size:11px;padding:6px 9px}.code-mode .ui-icon{width:14px;height:14px}}
+
 </style>
 </head>
 
@@ -443,6 +464,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
       <div class="composer-left">
         <button class="attach" id="attachBtn" type="button" title="Прикрепить файл" aria-label="Прикрепить файл"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.4 11.6-8.8 8.8a6 6 0 0 1-8.5-8.5l9.9-9.9a4 4 0 0 1 5.7 5.7l-9.9 9.9a2 2 0 0 1-2.8-2.8l8.5-8.5"/></svg></button>
         <span class="attach-caption">Фото и файлы</span>
+        <button class="code-mode" id="codeModeBtn" type="button" aria-pressed="false" title="Включить создание файлов с предварительным планом"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M14 4l-4 16"/></svg><span>Код → файл</span></button>
       </div>
       <input id="fileInput" type="file" hidden multiple accept="image/*,.pdf,.txt,.md,.json,.csv,.html,.htm,.css,.js,.mjs,.ts,.tsx,.jsx,.py,.lua,.java,.c,.cpp,.h,.cs,.go,.rs,.sql,.xml,.yaml,.yml,.toml,.ini,.log,.sh,.docx,.xlsx" />
       <button class="send" id="send" type="button" disabled aria-label="Отправить сообщение"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
@@ -751,6 +773,7 @@ let busy = false;
 let ctrl = null;
 let systemPrompt = DEFAULT_SYS;
 let authMode = "login";
+let manualCodeMode = false;
 
 let pendingAttachments = [];
 const MAX_ATTACHMENTS = 5;
@@ -1062,6 +1085,15 @@ $("authBack").onclick = () => {
   clearAuthError();
 };
 
+/* CODE -> FILE MODE */
+$("codeModeBtn").onclick=()=>{
+  manualCodeMode=!manualCodeMode;
+  $("codeModeBtn").setAttribute("aria-pressed", String(manualCodeMode));
+  $("codeModeBtn").title=manualCodeMode
+    ? "Режим файлов включён. Нажмите, чтобы выключить"
+    : "Включить создание файлов с предварительным планом";
+};
+
 /* MODEL SELECTION */
 
 $("modelSelect").addEventListener("change",() => {
@@ -1106,7 +1138,10 @@ function splitCodeArtifacts(source) {
       }
       content.push(lines[i]);
     }
-    blocks.push({l:opener[2].trim(),c:content.join("\n"),complete});
+    const recent=result.slice(-4).reverse().find(line=>line.trim())||"";
+    const previous=recent.trim();
+    const explicit=previous.match(/(?:^|\s)(?:файл|file)\s*[:：]\s*`?([\w.\/-]+\.[a-z0-9]+)`?\s*\**\s*$/i);
+    blocks.push({l:opener[2].trim(),c:content.join("\n"),complete,filename:explicit?.[1]||""});
     result.push("\u0000"+(blocks.length-1)+"\u0000");
     if(!complete) break;
   }
@@ -1117,7 +1152,46 @@ function hasUnclosedCodeFence(source) {
   return splitCodeArtifacts(source).blocks.some(b=>!b.complete);
 }
 
-function md(t) {
+function safeCodeFilename(value) {
+  const name=String(value||"").replace(/\\/g,"/").replace(/^\/+/,"").split("/").filter(x=>x && x!=="." && x!=="..").join("/");
+  return name.replace(/[^\w.\/\-]/g,"_").slice(0,140);
+}
+
+function filenameForCodeBlock(block) {
+  const language=String(block.l||"").toLowerCase().split(/\s+/)[0];
+  const fallback=language==="html" ? "index.html"
+    : language==="css" ? "style.css"
+    : ["javascript","js"].includes(language) ? "script.js"
+    : ["typescript","ts"].includes(language) ? "index.ts"
+    : ["python","py"].includes(language) ? "main.py"
+    : language==="json" ? "data.json"
+    : language==="sql" ? "query.sql"
+    : `venus-code.${extensionForLanguage(language||"text")}`;
+  return safeCodeFilename(block.filename)||fallback;
+}
+
+function inspectCodeFiles(source) {
+  const parsed=splitCodeArtifacts(source);
+  const files=parsed.blocks.filter(b=>b.c.trim()).map(b=>({
+    name:filenameForCodeBlock(b),text:b.c,lang:b.l,complete:b.complete
+  }));
+  const issues=[];
+  if(!files.length) issues.push("Модель не вернула файл в блоке кода");
+  if(files.some(f=>!f.complete)) issues.push("Блок кода не завершён");
+  if(files.some(f=>/\b(?:TODO|FIXME)\s*[:：]|остальной код|код без изменений|your code here|insert code here/i.test(f.text)))
+    issues.push("В коде есть явные незаполненные места");
+  for(const f of files) {
+    if(/\.html?$/i.test(f.name)&&/<html(?:\s|>)/i.test(f.text)&&!/<\/html\s*>/i.test(f.text))
+      issues.push(`${f.name}: не закрыт HTML-документ`);
+    if(/\.json$/i.test(f.name)) {
+      try { JSON.parse(f.text); }
+      catch { issues.push(`${f.name}: некорректный JSON`); }
+    }
+  }
+  return {files,issues};
+}
+
+function md(t,forceIncomplete=false) {
   const parsed=splitCodeArtifacts(t);
   const blocks=parsed.blocks;
   t=esc(parsed.text);
@@ -1194,23 +1268,16 @@ function md(t) {
     const block=blocks[+i];
     const rawLanguage=String(block.l||"").trim().toLowerCase().split(/\s+/)[0];
     const language=rawLanguage||"text";
-    const fileType=extensionForLanguage(language);
-    const fileName=language==="html" ? "index.html"
-      : language==="css" ? "style.css"
-      : language==="javascript"||language==="js" ? "script.js"
-      : language==="typescript"||language==="ts" ? "index.ts"
-      : language==="python"||language==="py" ? "main.py"
-      : language==="json" ? "data.json"
-      : language==="sql" ? "query.sql"
-      : `venus-code.${fileType}`;
+    const fileName=filenameForCodeBlock(block);
     const code=block.c; // retain every character and trailing newline
+    const complete=block.complete && !forceIncomplete;
     const lines=code ? code.split("\n").length : 0;
     const sample=(code.split("\n").find(line=>line.trim())||"Нажмите, чтобы открыть код").trim().slice(0,72);
     return `
-      <div class="artifact-card ${block.complete?"":"artifact-incomplete"}" data-artifact-complete="${block.complete}" data-artifact-lang="${esc(language)}" data-artifact-filename="${esc(fileName)}">
+      <div class="artifact-card ${complete?"":"artifact-incomplete"}" data-artifact-complete="${complete}" data-artifact-lang="${esc(language)}" data-artifact-filename="${esc(fileName)}">
         <button class="artifact-tile" type="button" data-open-artifact aria-label="Открыть артефакт ${esc(fileName)}">
           <span class="artifact-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9l-6-6H8Z"/><path d="M14 3v6h7M9 13l-3 3 3 3m6-6 3 3-3 3"/></svg></span>
-          <span class="artifact-info"><strong>${esc(fileName)}</strong><small>${esc(language.toUpperCase())} · ${lines} строк · ${block.complete?esc(sample):"Не завершён"}</small></span>
+          <span class="artifact-info"><strong>${esc(fileName)}</strong><small>${esc(language.toUpperCase())} · ${lines} строк · ${complete?esc(sample):"Не завершён"}</small></span>
           <span class="artifact-arrow" aria-hidden="true">↗</span>
         </button>
         <pre class="artifact-source" hidden><code>${esc(code)}</code></pre>
@@ -1330,9 +1397,11 @@ function msgHTML(m,index) {
     <div class="row">
       <div class="av"></div>
       <div class="bub">
-        ${md(m.content || "")}
-        ${m.truncated ? '<div class="response-incomplete">Ответ мог быть обрезан из-за лимита модели. Проверьте артефакт; можно попросить ИИ продолжить код.</div>' : ''}
+        ${md(m.content || "",!!m.truncated)}
+        ${m.truncated ? '<div class="response-incomplete">Ответ мог быть обрезан из-за лимита модели или проверка файла обнаружила проблему. Проверьте артефакт; можно попросить ИИ продолжить код.</div>' : ''}
+        ${m.codeBuild && !m.truncated && inspectCodeFiles(m.content).files.length ? '<div class="code-build-result">Файл готов к скачиванию. Откройте артефакт или сохраните файлы напрямую.</div>' : ''}
         <div class="message-actions">
+          ${m.codeBuild && !m.truncated && inspectCodeFiles(m.content).files.length ? `<button data-download-project data-index="${index}" type="button">${inspectCodeFiles(m.content).files.length===1?"Скачать файл":"Скачать проект ZIP"}</button>` : ''}
           <button data-copy-answer data-index="${index}">Копировать</button>
           <button data-share-answer data-index="${index}">Поделиться</button>
           <button data-download-answer data-index="${index}">Скачать .md</button>
@@ -1737,6 +1806,57 @@ function mergeCodeContinuation(previous,continued) {
   return previous+part.slice(overlap);
 }
 
+/* Two-pass coding workflow. The plan is a brief implementation outline, not hidden reasoning. */
+function shouldCreateFiles(prompt,chat) {
+  if(manualCodeMode) return true;
+  const t=String(prompt||"").toLowerCase();
+  const make=/(?:напиши|сделай|создай|сгенерируй|разработай|собери|реализуй|перепиши|переделай|добавь|исправь|почини|обнови|дай|скинь|отправь|построй|верстай|сверстай|хочу|нужен|нужна)/i;
+  const target=/(?:код|скрипт|программ|приложен|сайт|страниц|бота?\b|игру|проект|html|css|javascript|typescript|python|питон|pygame|lua|react|node|api|json|файл|artifact|артефакт)/i;
+  const explicit=/(?:кодом|полный код|файл с кодом|готовый файл|исходники|весь код)/i;
+  if(explicit.test(t)) return true;
+  if(make.test(t) && target.test(t)) return true;
+  const wasCode=chat?.messages?.slice(-3).some(m=>m.role==="assistant"&&splitCodeArtifacts(m.content).blocks.length>0);
+  return !!(wasCode && /(?:измен|добав|исправ|перепиш|передел|обнов|сделай так)/i.test(t));
+}
+
+function codeBuildHtml(stage,detail="") {
+  const labels=["Продумываю структуру", "Создаю полный код", "Проверяю файлы"];
+  return `<div class="code-build" role="status" aria-live="polite">
+    <div class="code-build-head"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M14 4l-4 16"/></svg>Venus AI · создание файлов</div>
+    <div class="code-build-steps">${labels.map((t,i)=>`<div class="code-build-step ${i<stage?"done":i===stage?"active":""}"><span class="indicator">${i<stage?"✓":i+1}</span><span>${t}</span></div>`).join("")}</div>
+    ${detail?`<div class="code-build-detail">${esc(detail)}</div>`:""}
+  </div>`;
+}
+
+async function requestVenusOnce(messages,model,headers,signal,maxTokens=500) {
+  const response=await fetch(API_URL,{
+    method:"POST",signal,headers,
+    body:JSON.stringify({model,messages,stream:false,max_tokens:maxTokens})
+  });
+  if(!response.ok) {
+    const raw=await response.text().catch(()=>"");
+    throw new Error(`Ошибка ${response.status}${raw?": "+raw.slice(0,300):""}`);
+  }
+  let output="";
+  await readVenusResponse(response,p=>{output+=p;});
+  return output.trim();
+}
+
+const PLAN_FOR_CODE = `Составь короткий технический план реализации задачи, которую пользователь только что поставил.
+Напиши только 2–5 конкретных пунктов: какие файлы нужны, какие компоненты/функции, как их связать и какие основные требования проверить.
+Не пиши код, не расписывай внутренние рассуждения, не задавай вопросов. Если достаточно одного файла — выбери один. Максимум 650 символов.`;
+
+function finalCodeInstruction(plan) {
+  return `Теперь РЕАЛИЗУЙ задачу пользователя полностью на основе контекста.
+Краткий план: ${plan||"Выбери простую цельную реализацию."}
+Требования к готовому ответу:
+1) Возвращай РЕАЛЬНОЕ полное содержимое каждого файла. Никаких многоточий, заглушек, пропущенных частей, «аналогично», «вставьте предыдущий код» и «остальное без изменений».
+2) Для каждого файла напиши строго: Файл: \`путь/имя.ext\` с новой строки, затем fenced code block с корректным языком, всем содержимым, закрывающей строкой из трёх обратных кавычек. Для одного файла выводи один артефакт.
+3) Учти импорты, зависимости, обработчики событий и адаптацию под платформу. Если пользователь дал готовый код, сохрани работающее поведение и исправь указанное.
+4) Перед завершением проверь согласованность имён функций и файлов, закрытие скобок и тегов, отсутствие пропущенных частей. Не утверждай, что запускал код, если не запускал.
+5) Минимум объяснений вне файлов. Не выводи скрытый ход рассуждений. Если ответ не помещается, продолжение будет запрошено отдельно: не обрезай решение намеренно.`.replace(/\`/g,"`");
+}
+
 /* SEND */
 
 async function send(text,attachmentsOverride=null) {
@@ -1762,6 +1882,7 @@ async function send(text,attachmentsOverride=null) {
     remoteUrl:a.remoteUrl||""
   }));
 
+  const codeBuild=shouldCreateFiles(text,c);
   c.messages.push({role:"user",content:text,attachments:storedAttachments});
 
   if(attachmentsOverride===null) {
@@ -1780,7 +1901,7 @@ async function send(text,attachmentsOverride=null) {
   $("wrap").insertAdjacentHTML("beforeend",`
     <div class="row" id="live">
       <div class="av"></div>
-      <div class="bub"><div class="dots"><i></i><i></i><i></i></div></div>
+      <div class="bub">${codeBuild?codeBuildHtml(0,"Готовлю краткий план реализации."):'<div class="dots"><i></i><i></i><i></i></div>'}</div>
     </div>
   `);
   $("msgs").scrollTop=$("msgs").scrollHeight;
@@ -1789,6 +1910,12 @@ async function send(text,attachmentsOverride=null) {
   upd();
   ctrl=new AbortController();
   const live=()=>$("live")?.lastElementChild;
+  const progress=(stage,detail="")=>{
+    if(!codeBuild)return;
+    const el=live();
+    if(el)el.innerHTML=codeBuildHtml(stage,detail);
+    $("msgs").scrollTop=$("msgs").scrollHeight;
+  };
 
   try {
     const messages=await buildApiMessages(c);
@@ -1801,13 +1928,24 @@ async function send(text,attachmentsOverride=null) {
       requestHeaders.Authorization = `Bearer ${await auth.currentUser.getIdToken()}`;
     }
 
-    // The API can stop at the generation limit even if HTTP status is 200.
-    // Resume at most twice. Never mark an unfinished artifact as complete.
-    let conversation=messages;
+    let outputMessages=messages;
+    if(codeBuild) {
+      // Actual short planning request: no pretend background thinking.
+      const plan=await requestVenusOnce(
+        [...messages,{role:"user",content:PLAN_FOR_CODE}],
+        selectedModel,requestHeaders,ctrl.signal,380
+      );
+      outputMessages=[...messages,{role:"user",content:finalCodeInstruction(plan.slice(0,1000))}];
+      progress(1,"План готов. Формирую исходные файлы без сокращений.");
+    }
+
+    // Keep requesting continuation when a file or response is truncated.
+    let conversation=outputMessages;
     let outputReason=null;
     let interrupted=false;
     let continued=0;
-    for(let round=0;round<3;round++) {
+    const maxRounds=codeBuild?4:3;
+    for(let round=0;round<maxRounds;round++) {
       const r=await fetch(API_URL,{
         method:"POST",
         signal:ctrl.signal,
@@ -1828,9 +1966,12 @@ async function send(text,attachmentsOverride=null) {
       let currentPart="";
       let lastPaint=0;
       const paint=()=>{
-        const el=live();
-        if(el) el.innerHTML=md(am.content);
-        $("msgs").scrollTop=$("msgs").scrollHeight;
+        if(codeBuild)progress(1,`Получено ${Math.round(am.content.length/1000*10)/10} тыс. символов${round?" · продолжаю файл":""}`);
+        else {
+          const el=live();
+          if(el)el.innerHTML=md(am.content);
+          $("msgs").scrollTop=$("msgs").scrollHeight;
+        }
       };
       const addText=piece=>{
         if(!piece) return;
@@ -1849,7 +1990,7 @@ async function send(text,attachmentsOverride=null) {
       const unfinished=hasUnclosedCodeFence(am.content);
       const limitHit=outputReason==="length";
       if(!limitHit && !unfinished && !interrupted) break;
-      if(round===2) break;
+      if(round===maxRounds-1) break;
       // Build context for the next round without resending partial code as an unrelated prompt.
       const prompt=unfinished
         ? "Продолжи НЕЗАВЕРШЁННЫЙ блок исходного кода строго с последнего символа. " +
@@ -1858,10 +1999,21 @@ async function send(text,attachmentsOverride=null) {
           "Убедись, что все теги, функции и скобки исходного файла закрыты."
         : "Продолжи предыдущий ответ с последнего символа, не повторяя уже выведенный текст. " +
           "Доведи решение до конца и не сокращай исходный код.";
-      conversation=[...messages,{role:"assistant",content:am.content},{role:"user",content:prompt}];
+      conversation=[...outputMessages,{role:"assistant",content:am.content},{role:"user",content:prompt}];
     }
-    am.truncated = outputReason==="length" || interrupted || hasUnclosedCodeFence(am.content);
-    if(am.truncated) console.warn("Venus AI: model reply may be incomplete",{outputReason,interrupted,continued});
+    if(codeBuild) {
+      progress(2,"Проверяю целостность блоков кода и имена файлов.");
+      const checked=inspectCodeFiles(am.content);
+      am.codeBuild=true;
+      am.truncated = outputReason==="length" || interrupted || checked.issues.length>0;
+      if(checked.issues.length) {
+        console.warn("Venus AI: issues in generated code",checked.issues);
+        // Do not expose a partially generated file as complete.
+      }
+    } else {
+      am.truncated = outputReason==="length" || interrupted || hasUnclosedCodeFence(am.content);
+    }
+    if(am.truncated) console.warn("Venus AI: reply may be incomplete",{outputReason,interrupted,continued});
 
     if(am.content) c.messages.push(am);
     if(!am.content && live()) live().innerHTML="<span>Модель не вернула ответ.</span>";
@@ -2194,6 +2346,74 @@ $("burger").onclick=()=>{
 $("back").onclick=closeSide;
 
 /* ARTIFACT VIEWER */
+/* Download one generated file, or all files as a .zip project. */
+function makeCodeZip(files) {
+  const encoder=new TextEncoder();
+  const chunks=[];
+  const directory=[];
+  let offset=0;
+  const table=new Uint32Array(256);
+  for(let n=0;n<256;n++){
+    let crc=n;
+    for(let bit=0;bit<8;bit++) crc=(crc&1)?(0xedb88320^(crc>>>1)):(crc>>>1);
+    table[n]=crc>>>0;
+  }
+  const checksum=bytes=>{
+    let crc=0xffffffff;
+    for(const byte of bytes)crc=table[(crc^byte)&255]^(crc>>>8);
+    return (crc^0xffffffff)>>>0;
+  };
+  const header=(len,write)=>{
+    const data=new Uint8Array(len);
+    write(new DataView(data.buffer));
+    return data;
+  };
+  files.forEach((file,index)=>{
+    const filename=safeCodeFilename(file.name)||`file-${index+1}.txt`;
+    const name=encoder.encode(filename);
+    const data=encoder.encode(file.text);
+    const crc=checksum(data);
+    const local=header(30,(v)=>{
+      v.setUint32(0,0x04034b50,true);v.setUint16(4,20,true);
+      v.setUint16(6,0x0800,true);v.setUint16(8,0,true);
+      v.setUint32(14,crc,true);v.setUint32(18,data.length,true);
+      v.setUint32(22,data.length,true);v.setUint16(26,name.length,true);
+    });
+    chunks.push(local,name,data);
+    const central=header(46,(v)=>{
+      v.setUint32(0,0x02014b50,true);v.setUint16(4,20,true);v.setUint16(6,20,true);
+      v.setUint16(8,0x0800,true);v.setUint16(10,0,true);
+      v.setUint32(16,crc,true);v.setUint32(20,data.length,true);
+      v.setUint32(24,data.length,true);v.setUint16(28,name.length,true);
+      v.setUint32(42,offset,true);
+    });
+    directory.push(central,name);
+    offset+=local.length+name.length+data.length;
+  });
+  const dirSize=directory.reduce((n,item)=>n+item.length,0);
+  const footer=header(22,(v)=>{
+    v.setUint32(0,0x06054b50,true);
+    v.setUint16(8,files.length,true);v.setUint16(10,files.length,true);
+    v.setUint32(12,dirSize,true);v.setUint32(16,offset,true);
+  });
+  return new Blob([...chunks,...directory,footer],{type:"application/zip"});
+}
+
+function saveGeneratedFiles(files) {
+  if(!files.length)return;
+  if(files.length===1) {
+    const filename=files[0].name.split("/").pop();
+    downloadBlob(files[0].text,filename,"text/plain;charset=utf-8");
+    return;
+  }
+  const blob=makeCodeZip(files);
+  const url=URL.createObjectURL(blob);
+  const link=document.createElement("a");
+  link.href=url;link.download="venus-ai-project.zip";
+  document.body.appendChild(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
+
 let openedArtifact=null;
 let artifactReturnFocus=null;
 
@@ -2206,6 +2426,8 @@ function openArtifact(card) {
   const complete=card.dataset.artifactComplete!=="false";
   openedArtifact={code,language,filename,complete};
   $("artifactWarning").hidden=complete;
+  $("artifactDownload").disabled=!complete;
+  $("artifactDownload").title=complete?"Скачать готовый файл":"Файл не завершён";
   artifactReturnFocus=document.activeElement;
   $("artifactCode").textContent=code;
   $("artifactTitle").textContent=filename;
@@ -2256,7 +2478,7 @@ $("artifactCopy").onclick=async()=>{
 };
 
 $("artifactDownload").onclick=()=>{
-  if(!openedArtifact) return;
+  if(!openedArtifact || !openedArtifact.complete) return;
   downloadBlob(openedArtifact.code,openedArtifact.filename,"text/plain;charset=utf-8");
 };
 
@@ -2300,6 +2522,14 @@ $("wrap").addEventListener("click",async e=>{
   if(!c || !Number.isInteger(index))return;
   const message=c.messages[index];
   if(!message || message.role!=="assistant")return;
+
+  if(e.target.closest("[data-download-project]")) {
+    if(message.truncated) { alert("Этот код ещё не завершён. Скачивание полного проекта недоступно.");return; }
+    const parsed=inspectCodeFiles(message.content);
+    if(parsed.issues.length) { alert("В файлах найдена проблема: "+parsed.issues.join("; "));return; }
+    saveGeneratedFiles(parsed.files);
+    return;
+  }
 
   if(e.target.closest("[data-copy-answer]")) {
     try {
