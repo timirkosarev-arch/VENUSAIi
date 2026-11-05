@@ -2000,6 +2000,19 @@ async function send(text,attachmentsOverride=null) {
     : attachmentsOverride.slice();
 
   if((!text && !chosenAttachments.length)||busy||!currentUser)return;
+
+  // API требует Firebase ID token. Гостю показываем окно входа,
+  // не очищая текст и выбранные вложения.
+  const firebaseUser = auth.currentUser ||
+    (currentUser.uid !== "guest" ? currentUser : null);
+
+  if (!firebaseUser) {
+    if (text && !$("inp").value.trim()) $("inp").value = text;
+    openAuth("login");
+    authError("Чтобы отправлять сообщения, войдите в аккаунт Venus AI.");
+    return;
+  }
+
   if(!text && chosenAttachments.length) text="Посмотри прикреплённые файлы и помоги с ними.";
 
   let c=active();
@@ -2048,13 +2061,25 @@ async function send(text,attachmentsOverride=null) {
     const userPayloads=messages.filter(x=>x.role==="user");
     if(!userPayloads.length) throw new Error("Нет сообщений для отправки.");
     const selectedModel=$("modelSelect").value;
+    const apiModel = selectedModel === MODELS.pro
+      ? "astro"
+      : selectedModel === MODELS.high
+        ? "high"
+        : "flash";
+
+    // Всегда отправляем проверенный Firebase ID token.
+    const idToken = await firebaseUser.getIdToken();
+    const requestHeaders = {
+      "Content-Type":"application/json",
+      "Authorization": `Bearer ${idToken}`
+    };
 
     const r=await fetch(API_URL,{
       method:"POST",
       signal:ctrl.signal,
-      headers:{"Content-Type":"application/json"},
+      headers:requestHeaders,
       body:JSON.stringify({
-        model:selectedModel,
+        model:apiModel,
         messages,
         stream:true,
         max_tokens:8192
