@@ -1283,13 +1283,13 @@ function msgHTML(m,index) {
         ).join("")}
       </div>` : "";
     return `
-      <div class="row u">
-        <div class="bub">
-          ${esc(m.content || "Прикреплённые файлы")}
-          ${attachmentHtml}
-        </div>
-      </div>
-    `;
+  <div class="row u">
+    <div class="bub">
+      ${esc(m.content || "Прикреплённые файлы")}
+      ${attachmentHtml}
+    </div>
+  </div>
+`;
   }
 
   return `
