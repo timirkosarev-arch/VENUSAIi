@@ -1,0 +1,3002 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<meta property="og:title" content="Venus AI">
+<meta property="og:image" content="https://i.ibb.co.com/PzWLhSZL/AI-png.jpg">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem("venus_theme_v2")||"light"}catch(e){document.documentElement.dataset.theme="light"}</script>
+<title>Venus AI</title>
+<meta name="venus-build" content="lines-timeout-2026-11-06">
+
+<link rel="icon" href="https://i.ibb.co.com/PzWLhSZL/AI-png.jpg">
+
+<style>
+/* Venus AI — Studio UI 2026. All existing application IDs are preserved. */
+:root {
+  color-scheme:light;
+  --bg:#ffffff; --side:#f8f8f7; --panel:#ffffff; --panel2:#f4f4f3;
+  --line:#e8e8e6; --text:#232322; --muted:#797974; --accent:#6051a8;
+  --accent2:#6954b7; --user:#f3f3f1; --card:#fff; --hover:#efefed;
+  --soft:#f6f6f4; --shadow:0 12px 50px rgba(30,30,30,.055);
+  --danger:#b23b58; --overlay:rgba(20,20,20,.42);
+  --ava:url('https://i.ibb.co.com/PzWLhSZL/AI-png.jpg');
+}
+:root[data-theme="dark"] {
+  color-scheme:dark;
+  --bg:#181818; --side:#111111; --panel:#242424; --panel2:#2d2d2d;
+  --line:#373737; --text:#f3f3f2; --muted:#a5a5a4; --accent:#c1aaff;
+  --accent2:#ae97fc; --user:#303030; --card:#252525; --hover:#272727;
+  --soft:#202020; --shadow:0 16px 50px rgba(0,0,0,.18);
+  --danger:#ff9cb3; --overlay:rgba(0,0,0,.73);
+}
+* { box-sizing:border-box; }
+[hidden] {display:none !important}
+html,body {height:100%;margin:0}
+body {background:var(--bg);color:var(--text);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Arial,sans-serif;overflow:hidden;letter-spacing:-.008em}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer;color:inherit;touch-action:manipulation}
+button:disabled{cursor:default;opacity:.45}
+a{color:inherit}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,a:focus-visible {outline:2px solid var(--accent);outline-offset:3px}
+.logo,.av {background:var(--ava) center/cover no-repeat;display:grid;place-items:center;flex-shrink:0;color:#fff;border:1px solid rgba(132,91,182,.16)}
+.logo::before,.av::before{content:none}
+.logo{width:33px;height:33px;border-radius:12px}
+.av{width:30px;height:30px;border-radius:11px;margin-top:2px}
+.av::before{font-size:14px}
+/* Structure */
+.app{display:flex;width:100%;height:100%;height:100dvh;overflow:hidden}
+.side{width:260px;min-width:260px;display:flex;flex-direction:column;gap:0;padding:20px 12px 13px;background:var(--side);border-right:1px solid color-mix(in srgb,var(--line) 58%,transparent);transition:transform .24s,width .24s,min-width .24s,padding .24s;z-index:22;overflow:hidden;padding-top:calc(20px + env(safe-area-inset-top,0px));padding-bottom:calc(13px + env(safe-area-inset-bottom,0px))}
+.brand{height:49px;display:flex;align-items:center;gap:11px;padding:0 11px 18px;font-weight:720;font-size:18px;letter-spacing:-.055em;white-space:nowrap}
+.brand em{font-style:normal;color:var(--muted);font-size:10px;letter-spacing:.09em;font-weight:700;margin-left:auto;border:1px solid var(--line);padding:2px 6px;border-radius:6px}
+.new{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;padding:10px 12px;border-radius:11px;text-align:left;font-size:14px;font-weight:510;min-height:41px;transition:background .15s}
+.new:hover,.chat:hover{background:var(--hover)}
+.new .ui-icon,.foot-actions .ui-icon{width:17px;height:17px;flex-shrink:0}
+#newBtn{margin:8px 0 13px;font-weight:620}
+.sidebar-subtitle{color:var(--muted);text-transform:uppercase;font-size:10px;font-weight:750;letter-spacing:.11em;padding:8px 14px 9px}
+.list{display:flex;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;flex-direction:column;gap:3px;padding:0 2px 8px}
+.chat{display:flex;align-items:center;gap:6px;padding:9px 7px 9px 12px;min-height:39px;font-size:13px;border-radius:10px;cursor:pointer;transition:background .15s}
+.chat.on{background:var(--hover)}
+.chat span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat .x{border:0;background:transparent;padding:3px 7px;color:var(--muted);border-radius:7px;opacity:0;line-height:1.1}
+.chat:hover .x,.chat.on .x{opacity:.75}
+.chat .x:hover{background:var(--panel2);color:var(--danger)}
+.foot{padding-top:12px;border-top:1px solid var(--line);flex-shrink:0}
+.foot-actions{display:flex;flex-direction:column;gap:2px}
+.foot-actions .new{font-size:13px;padding:9px 12px;min-height:37px}
+.telegram{text-decoration:none}
+.pro-upgrade{background:linear-gradient(116deg,rgba(118,85,188,.11),rgba(118,85,188,.045));border:1px solid rgba(118,85,188,.23);color:var(--text);font-weight:650;margin:4px 0 12px;border-radius:12px}
+.pro-upgrade:hover{background:rgba(118,85,188,.15)}
+.pro-upgrade .sparkle{color:var(--accent);font-size:15px}
+.admin-open{margin:8px 0 3px;border:1px solid var(--line);font-size:13px}
+.register-guest{justify-content:center;border:1px solid var(--line);margin:7px 0}
+.account{display:flex;align-items:center;gap:10px;padding:14px 7px 2px;border-top:1px solid var(--line);margin-top:10px;min-width:0}
+.account-avatar{height:34px;width:34px;border-radius:50%;flex-shrink:0;background:var(--ava) center/cover no-repeat;display:grid;place-items:center;font-size:14px;font-weight:750}
+.account-avatar::before{content:none}
+.account-info{flex:1;min-width:0}
+.account-info div{font-size:12.5px;font-weight:630;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.account-info small{display:block;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.logout{border:0;background:transparent;padding:7px;border-radius:9px;color:var(--muted);display:grid;place-items:center;flex-shrink:0}
+.logout:hover{background:var(--hover);color:var(--text)}
+.main{height:100%;min-height:0;flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg);position:relative}
+.top{min-height:70px;display:flex;align-items:center;gap:8px;padding:12px 26px;padding-top:calc(12px + env(safe-area-inset-top,0px));flex-shrink:0}
+.burger,.sidebar-toggle,.theme-toggle,.top-new{width:38px;height:38px;border:0;background:transparent;display:grid;place-items:center;border-radius:10px;color:var(--muted);flex-shrink:0}
+.burger{display:none}.sidebar-toggle{display:grid}
+.burger:hover,.sidebar-toggle:hover,.theme-toggle:hover,.top-new:hover{background:var(--hover);color:var(--text)}
+.ui-icon{width:19px;height:19px;display:inline-block;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.title{font-size:15px;font-weight:690;letter-spacing:-.02em;flex:0 1 auto;max-width:min(32vw,350px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.model-select{border:0;background:transparent;color:var(--muted);font-size:13px;font-weight:650;padding:8px 26px 8px 10px;max-width:175px;width:auto;outline:0;border-radius:10px;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238c8b8b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 5px center;background-size:15px}
+.model-select:hover{background-color:var(--hover);color:var(--text)}
+.model-select option{background:var(--panel);color:var(--text)}
+.top-right{margin-left:auto;display:flex;align-items:center;gap:5px}
+.top-pro{font-size:11px;font-weight:730;border-radius:999px;padding:4px 9px;background:rgba(137,94,219,.11);color:var(--accent);border:1px solid rgba(137,94,219,.18)}
+.pro-status{margin:0 auto 2px;max-width:min(760px,calc(100% - 38px));width:100%;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;border:1px solid rgba(137,94,219,.15);background:rgba(137,94,219,.055);border-radius:11px;font-size:11.5px;color:var(--muted)}
+.pro-status strong{color:var(--accent);font-weight:720}
+.pro-status span{font-variant-numeric:tabular-nums}
+/* Chat */
+.msgs{flex:1;min-height:0;overflow:auto;scroll-behavior:smooth;overscroll-behavior:contain}
+.wrap{max-width:804px;margin:0 auto;padding:20px 30px 35px;min-height:100%}
+.hero{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:13px;padding:20px 0 42px}
+.hero .logo{width:47px;height:47px;border-radius:16px;box-shadow:0 8px 30px rgba(45,37,65,.12)}
+.hero .logo::before{font-size:24px}
+.hero h1{font-size:clamp(27px,3vw,35px);letter-spacing:-.055em;font-weight:690;line-height:1.2;margin:4px 0 0}
+.hero p{color:var(--muted);max-width:440px;font-size:14px;margin:0 0 13px}
+.sugs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:min(100%,570px);margin-top:6px;text-align:left}
+.sugs button{border:1px solid var(--line);background:var(--card);box-shadow:0 2px 5px rgba(25,25,25,.02);border-radius:15px;min-height:76px;padding:13px 15px;text-align:left;display:flex;flex-direction:column;justify-content:center;gap:3px;transition:border-color .16s,transform .16s,background .16s}
+.sugs button:hover{background:var(--soft);border-color:color-mix(in srgb,var(--text) 16%,var(--line));transform:translateY(-2px)}
+.sugs button .sug-head{font-weight:650;font-size:13.5px;color:var(--text)}
+.sugs button .sug-sub{font-size:11.5px;color:var(--muted)}
+.row{display:flex;align-items:flex-start;gap:12px;margin:0 0 12px;min-width:0}
+.row.u{justify-content:flex-end;margin-top:4px;margin-bottom:12px}
+.bub{min-width:0;max-width:100%;overflow-wrap:anywhere;font-size:14.5px;line-height:1.55}
+.u .bub{background:var(--user);border-radius:19px;padding:11px 16px;max-width:min(81%,600px);white-space:pre-wrap;line-height:1.6}
+.bub p{margin:0 0 .45em}.bub p:last-child{margin:0}
+.bub ul,.bub ol{padding-left:23px;margin:5px 0 14px}
+.bub li{margin:4px 0}
+.bub h1,.bub h2,.bub h3{line-height:1.35;letter-spacing:-.03em;margin:1.2em 0 .55em}
+.bub h1{font-size:1.45em}.bub h2{font-size:1.22em}.bub h3{font-size:1.08em}
+.bub code{background:var(--panel2);padding:2px 5px;border-radius:5px;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.bub a{color:var(--accent);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px}
+.pre{background:var(--soft);border:1px solid var(--line);border-radius:13px;margin:.8em 0 1.1em;overflow:hidden;max-width:100%}
+.pre .h{display:flex;justify-content:space-between;align-items:center;gap:9px;background:var(--panel2);border-bottom:1px solid var(--line);padding:7px 13px;font:12px ui-monospace,monospace;color:var(--muted)}
+.pre .h .code-actions{display:flex;gap:5px;align-items:center}
+.pre .h button{border:0;background:transparent;border-radius:6px;padding:5px 7px;color:var(--muted);font-family:inherit;font-size:11px}
+.pre .h button:hover{background:var(--hover);color:var(--text)}
+.pre pre{padding:14px 16px;margin:0;overflow:auto;font:12.5px/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.pre code{background:transparent;padding:0}
+.dots{display:inline-flex;gap:5px;padding:12px 0}.dots i{width:7px;height:7px;background:var(--muted);border-radius:50%;animation:dotPulse 1.1s infinite}.dots i:nth-child(2){animation-delay:.14s}.dots i:nth-child(3){animation-delay:.28s}
+@keyframes dotPulse{0%,70%,100%{opacity:.25;transform:scale(.75)}35%{opacity:1;transform:scale(1)}}
+.err{color:var(--danger);background:color-mix(in srgb,var(--danger) 7%,var(--bg));border:1px solid color-mix(in srgb,var(--danger) 20%,var(--bg));padding:10px 12px;border-radius:11px}
+.message-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:12px;opacity:.42;transition:opacity .15s}
+.row:hover .message-actions{opacity:1}
+.message-actions button{border:0;background:transparent;color:var(--muted);font-size:11.5px;padding:5px 7px;border-radius:8px}
+.message-actions button:hover{background:var(--hover);color:var(--text)}
+/* Composer */
+.comp{flex-shrink:0;padding:8px 25px calc(17px + env(safe-area-inset-bottom,0px));background:var(--bg)}
+.box{max-width:764px;margin:0 auto;display:flex;flex-direction:column;gap:3px;padding:13px 13px 11px 16px;background:var(--panel);border:1px solid color-mix(in srgb,var(--line) 93%,var(--text));border-radius:24px;box-shadow:0 5px 26px rgba(0,0,0,.06);transition:border-color .15s,box-shadow .15s}
+.box:focus-within{border-color:color-mix(in srgb,var(--accent) 38%,var(--line));box-shadow:0 6px 25px rgba(0,0,0,.08)}
+#inp{min-height:35px;width:100%;max-height:195px;overflow-y:auto;border:0;outline:0;resize:none;background:transparent;padding:5px 5px 7px 3px;line-height:1.55;color:var(--text);font-size:14.5px}
+#inp::placeholder{color:var(--muted)}
+.composer-tools{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:40px}
+.composer-left{display:flex;align-items:center;gap:9px}
+.attach{display:grid;place-items:center;width:37px;height:37px;border:1px solid var(--line);border-radius:50%;background:transparent;color:var(--text)}
+.attach:hover{background:var(--hover)}
+.attach .ui-icon{width:18px;height:18px}
+.attach-caption{font-size:11px;color:var(--muted);letter-spacing:.01em}
+.send{width:37px;height:37px;display:grid;place-items:center;background:#202020;color:#fff;border-radius:50%;border:0;flex-shrink:0;transition:transform .16s,background .16s}
+.send:hover:not(:disabled){background:#444;transform:translateY(-1px)}
+.send:disabled{background:var(--hover);color:var(--muted);opacity:1}
+.send svg{width:18px;height:18px}
+.note{max-width:760px;margin:10px auto 0;text-align:center;color:var(--muted);font-size:10.5px;line-height:1.5}
+.attachment-tray{max-width:764px;margin:10px auto 0;display:flex;flex-wrap:wrap;gap:8px}
+.attachment-item{position:relative;width:94px;min-height:78px;display:flex;flex-direction:column;gap:5px;border:1px solid var(--line);background:var(--panel2);border-radius:12px;padding:6px;overflow:hidden}
+.attachment-item img{width:100%;height:66px;object-fit:cover;border-radius:7px}
+.attachment-item .file-icon{font-size:24px;text-align:center;line-height:41px}
+.attachment-item .file-name{font-size:10px;color:var(--muted);white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.remove-attachment{position:absolute;right:3px;top:3px;width:22px;height:22px;border:0;border-radius:50%;background:var(--text);color:var(--bg);font-size:15px}
+.attachment-hint{width:100%;color:var(--muted);font-size:11px}
+.user-attachments{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;max-width:380px}
+.user-attachments img{width:min(180px,42vw);height:142px;object-fit:cover;border-radius:13px;border:1px solid var(--line)}
+.user-file{display:flex;align-items:center;gap:7px;padding:7px 10px;border-radius:10px;background:var(--panel2);font-size:12px;max-width:230px}
+.user-file span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Dialogs */
+.mod{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:16px;background:var(--overlay);backdrop-filter:blur(5px)}
+.mod.on{display:flex}
+.card{background:var(--card);border:1px solid var(--line);width:100%;max-width:460px;padding:26px;border-radius:22px;display:flex;flex-direction:column;gap:13px;box-shadow:var(--shadow);max-height:92dvh;overflow:auto}
+.card h2{font-size:21px;letter-spacing:-.04em;font-weight:720;margin:0}
+.card label{display:flex;flex-direction:column;gap:7px;color:var(--muted);font-size:12px;font-weight:590}
+.card textarea,.admin-email-input{background:var(--soft);color:var(--text);border:1px solid var(--line);border-radius:11px;padding:12px 13px;outline:0;width:100%}
+.card textarea{min-height:130px;max-height:260px;resize:vertical}
+.card textarea:focus,.admin-email-input:focus{border-color:var(--accent)}
+.btns{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}
+.btn{padding:10px 15px;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:10px;font-size:13px;font-weight:610}
+.btn:hover{filter:brightness(.97)}
+.btn.p{border-color:transparent;background:var(--text);color:var(--bg)}
+.pro-card{text-align:center;max-width:420px;gap:15px}
+.pro-kicker{font-size:10px;font-weight:750;color:var(--accent);letter-spacing:.18em}
+.pro-card h2{font-size:27px}
+.pro-description{font-size:12.5px;line-height:1.6;color:var(--muted);margin:0}
+.pro-price-line{display:flex;justify-content:center;align-items:baseline;gap:9px;margin:6px 0}
+.old-price{font-size:21px;text-decoration:line-through;color:var(--muted)}
+.new-price{font-size:50px;font-weight:760;letter-spacing:-.065em;color:var(--text)}
+.per-month{color:var(--muted);font-size:13px}
+.pro-price-note{font-size:12px;color:var(--muted)}
+.pro-buy{width:100%;font-size:14px;padding:13px}
+.admin-card{max-height:min(88dvh,740px)}
+.admin-feedback{min-height:17px;font-size:12px;color:var(--accent)}
+.grant-list-title{font-size:12px;font-weight:750}
+.grant-list{display:flex;flex-direction:column;gap:8px;max-height:255px;overflow:auto}
+.grant-empty{text-align:center;color:var(--muted);padding:14px 10px;border-radius:11px;border:1px dashed var(--line);font-size:12px}
+.grant-row{display:flex;align-items:center;gap:10px;padding:10px 11px;border:1px solid var(--line);border-radius:12px;background:var(--soft)}
+.grant-meta{flex:1;min-width:0}.grant-email{font-size:12px;font-weight:620;overflow-wrap:anywhere}.grant-expiry{color:var(--muted);font-size:10.5px;margin-top:3px}
+.grant-remove{padding:7px 10px;border-radius:9px;border:1px solid color-mix(in srgb,var(--danger) 28%,var(--line));background:transparent;color:var(--danger);font-size:11px}
+/* Authentication */
+.auth-screen{position:fixed;inset:0;height:100%;height:100dvh;display:flex;align-items:center;justify-content:center;overflow:auto;padding:20px;background:var(--soft);z-index:60}
+.auth-card{width:100%;max-width:415px;padding:28px;background:var(--card);border:1px solid var(--line);border-radius:25px;box-shadow:var(--shadow)}
+.auth-back{border:0;background:transparent;color:var(--muted);padding:7px 1px;font-size:12px;margin-bottom:14px}
+.auth-back:hover{color:var(--text)}
+.auth-head{text-align:center;margin-bottom:24px}
+.auth-head .logo{width:55px;height:55px;margin:0 auto 15px;border-radius:17px}
+.auth-head .logo::before{font-size:23px}
+.auth-head h1{font-weight:750;letter-spacing:-.055em;font-size:26px;margin:0}
+.auth-head p{font-size:13px;color:var(--muted);margin-top:4px}
+.auth-google{display:flex;justify-content:center;align-items:center;gap:10px;border:1px solid var(--line);border-radius:12px;width:100%;padding:12px 15px;background:var(--panel);font-size:13px;font-weight:650;color:var(--text)}
+.auth-google:hover{background:var(--hover)}
+.google-g{font-size:19px;color:#4285f4;font-weight:800}
+.auth-divider{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:11px;margin:19px 0}
+.auth-divider::before,.auth-divider::after{content:"";height:1px;flex:1;background:var(--line)}
+.auth-form{display:flex;flex-direction:column;gap:11px}
+.auth-form input{width:100%;padding:12px 14px;border:1px solid var(--line);background:var(--soft);color:var(--text);border-radius:10px;outline:0;font-size:13px}
+.auth-form input:focus{border-color:var(--accent)}
+.auth-primary{width:100%;padding:12px;border:0;border-radius:11px;background:var(--text);color:var(--bg);font-weight:700;font-size:13px}
+.auth-switch{width:100%;margin-top:16px;background:transparent;color:var(--accent);font-size:12px;border:0}
+.auth-error{display:none;background:color-mix(in srgb,var(--danger) 10%,var(--bg));color:var(--danger);border-radius:9px;padding:9px;font-size:12px}
+.auth-info{text-align:center;margin-top:18px;color:var(--muted);font-size:11px}
+.back{display:none}
+/* Sidebar collapsed on desktop */
+.app.sidebar-collapsed .side{width:0;min-width:0;padding-left:0;padding-right:0;border-right:0}
+/* Scrolling */
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--muted) 28%,transparent);border-radius:12px}
+/* Responsive */
+@media(max-width:900px){
+  .side{position:fixed;inset:0 auto 0 0;width:min(286px,84vw);min-width:0;transform:translateX(-105%);box-shadow:8px 0 30px rgba(0,0,0,.08)}
+  .side.on{transform:translateX(0)}
+  .app.sidebar-collapsed .side{width:min(286px,84vw);padding-left:12px;padding-right:12px}
+  .back.on{display:block;position:fixed;inset:0;background:var(--overlay);z-index:21}
+  .burger{display:grid}.sidebar-toggle{display:none}
+  .top{padding:9px 16px;min-height:64px;padding-top:calc(9px + env(safe-area-inset-top,0px))}
+}
+@media(max-width:600px){
+  .top{min-height:58px;padding-left:9px;padding-right:11px;gap:3px}
+  .title{font-size:14px;max-width:32vw}
+  .model-select{font-size:12px;max-width:125px;padding-left:6px;padding-right:20px;background-position:right 2px center}
+  .top-pro{display:none}
+  .theme-toggle,.top-new,.burger{width:34px;height:34px}
+  .wrap{padding:12px 17px 22px}
+  .hero{padding:20px 0 27px}
+  .hero h1{font-size:28px}
+  .hero p{font-size:13px}
+  .sugs{gap:8px}
+  .sugs button{min-height:75px;padding:10px 11px}
+  .sugs button .sug-head{font-size:12px}
+  .sugs button .sug-sub{font-size:10px}
+  .row{gap:9px;margin-bottom:12px}
+  .bub{font-size:14px}
+  .u .bub{max-width:87%;padding:10px 12px}
+  .av{width:27px;height:27px}
+  .comp{padding:6px 10px calc(10px + env(safe-area-inset-bottom,0px))}
+  .box{border-radius:22px;padding:10px 10px 9px 12px}
+  #inp{font-size:16px}
+  .note{font-size:9.5px;margin-top:7px}
+  .message-actions{opacity:.85}
+  .card{padding:22px}
+  .pro-status{font-size:10.5px;gap:5px}
+}
+@media(max-width:365px){.title{display:none}.sugs{grid-template-columns:1fr}.sugs button{min-height:58px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+
+
+/* Click-to-open code artifacts */
+.artifact-card{margin:13px 0 17px;max-width:100%;width:min(100%,620px)}
+.artifact-tile{width:100%;border:1px solid var(--line);background:var(--card);border-radius:16px;padding:15px 16px;text-align:left;color:var(--text);display:flex;align-items:center;gap:14px;box-shadow:0 3px 12px rgba(0,0,0,.025);transition:transform .16s,box-shadow .16s,border-color .16s}
+.artifact-tile:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.artifact-symbol{width:43px;height:43px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,#f2ebff,#e4d8ff);color:#6749ad;flex-shrink:0}
+:root[data-theme="dark"] .artifact-symbol{background:#362b45;color:#ddc9ff}
+.artifact-symbol svg{width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.artifact-info{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.artifact-info strong{font-size:13.5px;font-weight:700;line-height:1.4;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.artifact-info small{font-size:11px;color:var(--muted);line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.artifact-arrow{font-size:20px;color:var(--muted);padding:0 3px;transition:transform .16s}
+.artifact-tile:hover .artifact-arrow{transform:translateX(3px);color:var(--accent)}
+.artifact-modal{z-index:85;padding:clamp(8px,2vw,22px)}
+.artifact-dialog{width:min(1100px,100%);height:min(88dvh,850px);background:var(--bg);color:var(--text);border-radius:20px;border:1px solid var(--line);box-shadow:0 24px 95px rgba(0,0,0,.25);display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.artifact-dialog-header{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line);flex-shrink:0}
+.artifact-dialog-avatar{width:35px;height:35px;border-radius:10px;background:var(--ava) center/cover no-repeat;flex-shrink:0}
+.artifact-dialog-heading{display:flex;flex-direction:column;gap:0;min-width:0;flex:1}
+.artifact-dialog-heading strong{font-size:14px;font-weight:725;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.artifact-dialog-heading small{font-size:11px;color:var(--muted)}
+.artifact-icon-btn{border:1px solid var(--line);background:var(--panel);border-radius:10px;min-height:37px;padding:6px 11px;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-size:12px;font-weight:650;transition:background .15s,border-color .15s}
+.artifact-icon-btn:hover{background:var(--hover);border-color:var(--accent)}
+.artifact-icon-btn img{width:17px;height:17px;object-fit:contain;flex-shrink:0}
+:root[data-theme="dark"] .artifact-icon-btn img{filter:invert(1)}
+.artifact-close{width:37px;height:37px;display:grid;place-items:center;border:0;border-radius:10px;background:transparent;font-size:24px;line-height:1;color:var(--muted)}
+.artifact-close:hover{background:var(--hover);color:var(--text)}
+.artifact-codebar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 18px;background:var(--panel2);border-bottom:1px solid var(--line);font-size:11px;color:var(--muted)}
+.artifact-codebar strong{font-weight:700;color:var(--text)}
+.artifact-codebar span{font-variant-numeric:tabular-nums}
+.artifact-codearea{flex:1;min-height:0;overflow:auto;background:var(--soft)}
+.artifact-codearea pre{margin:0;padding:24px 24px 34px;min-width:max-content;tab-size:2;font:13px/1.75 ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;white-space:pre;color:var(--text)}
+.artifact-codearea code{font:inherit}
+.artifact-dialog-footer{flex-shrink:0;border-top:1px solid var(--line);padding:10px 18px;background:var(--panel);display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--muted);font-size:11px}
+.artifact-commands{display:flex;align-items:center;gap:8px}
+@media(max-width:680px){
+  .artifact-modal{padding:0}
+  .artifact-dialog{height:100dvh;width:100%;border-radius:0;border:0}
+  .artifact-dialog-header{padding:12px 12px;gap:8px}
+  .artifact-dialog-avatar{width:31px;height:31px}
+  .artifact-codearea pre{padding:16px 14px 24px;font-size:12px;line-height:1.65}
+  .artifact-icon-btn{min-height:35px;padding:6px 8px;gap:5px;font-size:11px}
+  .artifact-icon-btn img{width:15px;height:15px}
+  .artifact-dialog-footer{padding:10px 12px}
+  .artifact-codebar{padding:7px 13px}
+}
+
+
+/* Show the true state of streamed / unfinished code, rather than silently treating it as complete. */
+.artifact-warning{font-size:12px;line-height:1.5;padding:10px 16px;color:#a45d13;background:#fff4dc;border-bottom:1px solid #f3d49c}
+:root[data-theme="dark"] .artifact-warning{background:#3d311b;color:#ffe1a5;border-color:#64502d}
+.artifact-incomplete .artifact-tile{border-color:#cf9e58}
+.artifact-incomplete .artifact-info small{color:#ac741e}
+:root[data-theme="dark"] .artifact-incomplete .artifact-info small{color:#f0c17b}
+.response-incomplete{font-size:12px;line-height:1.5;color:#a45d13;margin:10px 0;border:1px solid #e4c28d;border-radius:9px;padding:8px 10px}
+:root[data-theme="dark"] .response-incomplete{color:#f0c17b;border-color:#644c2b}
+
+
+/* Dedicated code-to-file workflow */
+.code-mode{display:inline-flex;gap:6px;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:999px;padding:7px 11px;background:transparent;color:var(--muted);font-size:11.5px;font-weight:640;min-height:33px;white-space:nowrap;transition:background .16s,border-color .16s}
+.code-mode .ui-icon{width:16px;height:16px}
+.code-mode:hover{background:var(--hover);color:var(--text)}
+.code-mode[aria-pressed="true"]{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 48%,var(--line));background:color-mix(in srgb,var(--accent) 9%,var(--panel))}
+.code-build{border:1px solid var(--line);border-radius:16px;padding:15px 17px;max-width:440px;width:min(440px,calc(100vw - 95px));background:var(--panel);box-shadow:var(--shadow)}
+.code-build-head{display:flex;align-items:center;gap:10px;font-weight:700;font-size:13px;margin-bottom:11px}
+.code-build-head .ui-icon{color:var(--accent);width:18px;height:18px}
+.code-build-steps{display:grid;gap:9px}
+.code-build-step{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:12px}
+.code-build-step .indicator{width:17px;height:17px;display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;font-size:10px;flex-shrink:0}
+.code-build-step.active{color:var(--text);font-weight:650}
+.code-build-step.active .indicator{background:var(--accent);border-color:var(--accent);color:#fff;animation:codePulse 1.1s infinite alternate}
+.code-build-step.done .indicator{background:color-mix(in srgb,var(--accent) 12%,var(--panel));color:var(--accent);border-color:transparent}
+.code-build-detail{margin-top:11px;color:var(--muted);font-size:11px;line-height:1.5;overflow-wrap:anywhere}
+.code-draft-private{padding:15px 16px;border-radius:14px;border:1px solid var(--line);background:var(--panel);color:var(--text);font-size:13px;line-height:1.6}
+.code-draft-private strong{display:block;font-size:13px;margin-bottom:5px}
+.code-draft-private small{display:block;color:var(--muted);font-size:11px}
+@keyframes codePulse{from{opacity:.55}to{opacity:1}}
+.code-build-result{margin:8px 0 0;border-radius:10px;background:color-mix(in srgb,var(--accent) 7%,var(--panel));padding:8px 11px;font-size:11.5px;color:var(--accent)}
+.message-actions [data-download-project]{color:var(--accent);font-weight:710;border:1px solid color-mix(in srgb,var(--accent) 30%,var(--line));padding:6px 10px;background:color-mix(in srgb,var(--accent) 7%,var(--bg))}
+@media(max-width:600px){.attach-caption{display:none}.composer-left{gap:7px}.code-mode{font-size:11px;padding:6px 9px}.code-mode .ui-icon{width:14px;height:14px}}
+
+/* Token usage meter */
+.token-meter {display:flex;align-items:center;gap:6px;padding:6px 11px;border:1px solid var(--line);border-radius:999px;font-size:12px;white-space:nowrap;color:var(--muted);background:var(--panel)}
+.token-meter .ui-icon{width:15px;height:15px;stroke:var(--accent)}
+@media(max-width:720px){.token-meter{padding:6px 8px;font-size:11px}.token-meter .ui-icon{display:none}}
+@media(max-width:720px){.line-meter{padding:6px 8px}}
+@media(max-width:540px){.token-meter,.line-meter{font-size:10px;padding:5px 6px;letter-spacing:-.15px}}
+@media(max-width:385px){.token-meter{max-width:90px;overflow:hidden;text-overflow:ellipsis}.token-meter #tokenCount{overflow:hidden;text-overflow:ellipsis}.line-meter{max-width:67px;overflow:hidden;text-overflow:ellipsis}}
+</style>
+</head>
+
+<body>
+
+<!-- AUTH SCREEN -->
+
+<div class="auth-screen" id="authScreen" hidden>
+  <div class="auth-card">
+
+    <button class="auth-back" id="authBack" type="button">← Назад в чат</button>
+
+    <div class="auth-head">
+      <div class="logo"></div>
+      <h1>Venus AI</h1>
+      <p id="authSubtitle">Войдите, чтобы продолжить</p>
+    </div>
+
+    <button class="auth-google" id="googleBtn">
+      <span class="google-g">G</span>
+      Продолжить с Google
+    </button>
+
+    <div class="auth-divider">или через аккаунт</div>
+
+    <form class="auth-form" id="authForm">
+
+      <input id="aName"
+        placeholder="Имя пользователя"
+        autocomplete="nickname"
+        hidden>
+
+      <input id="aEmail"
+        type="email"
+        placeholder="Email"
+        autocomplete="email"
+        required>
+
+      <input id="aPassword"
+        type="password"
+        placeholder="Пароль"
+        autocomplete="current-password"
+        minlength="6"
+        required>
+
+      <input id="aConfirm"
+        type="password"
+        placeholder="Повторите пароль"
+        autocomplete="new-password"
+        minlength="6"
+        hidden>
+
+      <div class="auth-error" id="authError"></div>
+
+      <button class="auth-primary" id="authSubmit" type="submit">
+        Войти
+      </button>
+
+    </form>
+
+    <button class="auth-switch" id="authSwitch">
+      Нет аккаунта? Зарегистрироваться
+    </button>
+
+    <div class="auth-info">
+      Вход защищён Firebase Authentication.
+    </div>
+
+  </div>
+</div>
+
+<!-- MAIN APP -->
+
+<div class="app" id="app">
+
+  <aside class="side" id="side">
+  <div class="brand"><div class="logo"></div><span>Venus AI</span><em>STUDIO</em></div>
+  <button class="new" id="newBtn" type="button"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L10 16l-4 1 1-4Z"/><path d="M4 4h7M4 4v16h16v-7"/></svg><span class="new-label">Новый чат</span></button>
+  <button class="new pro-upgrade" id="upgradeBtn" type="button"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3ZM19 17l.7 2.3L22 20l-2.3.7L19 23l-.7-2.3L16 20l2.3-.7L19 17Z"/></svg><span id="upgradeText">Перейти на Pro</span></button>
+  <div class="sidebar-subtitle">История чатов</div>
+  <div class="list" id="list"></div>
+  <div class="foot">
+    <div class="foot-actions">
+      <button class="new" id="setBtn" type="button"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06-1.91 1.91-.06-.06A1.65 1.65 0 0 0 16 18.4a1.65 1.65 0 0 0-1 .6 1.65 1.65 0 0 0-.4 1.07V21h-2.7v-.93a1.65 1.65 0 0 0-1.25-1.6 1.65 1.65 0 0 0-1.67.37l-.06.06-1.91-1.91.06-.06A1.65 1.65 0 0 0 7.4 15a1.65 1.65 0 0 0-1.47-1H5v-2.7h.93a1.65 1.65 0 0 0 1.6-1.25 1.65 1.65 0 0 0-.37-1.67l-.06-.06 1.91-1.91.06.06A1.65 1.65 0 0 0 11 6.6a1.65 1.65 0 0 0 1-1.53V4h2.7v1.07a1.65 1.65 0 0 0 1.25 1.6 1.65 1.65 0 0 0 1.67-.37l.06-.06 1.91 1.91-.06.06A1.65 1.65 0 0 0 18.4 10a1.65 1.65 0 0 0 1.47 1H21v2.7h-1.13A1.65 1.65 0 0 0 19.4 15Z"/></svg><span>Настройки</span></button>
+      <a class="new telegram" href="https://t.me/venus1ai" target="_blank" rel="noopener noreferrer"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.5 3-8.1 18-3.7-7.8L2 9.5 21.5 3ZM9.7 13.2 21.5 3"/></svg><span>Telegram</span></a>
+    </div>
+    <button class="new admin-open" id="adminBtn" type="button" hidden><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg><span>Управление Pro</span></button>
+    <button class="new register-guest" id="registerBtn" type="button">Войти / Регистрация</button>
+    <div class="account">
+      <div class="account-avatar" aria-hidden="true"></div>
+      <div class="account-info"><div id="accountName">Пользователь</div><small id="accountEmail"></small></div>
+      <button class="logout" id="logoutBtn" type="button" title="Выйти из аккаунта" aria-label="Выйти" hidden><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></svg></button>
+    </div>
+  </div>
+</aside>
+
+  <div class="back" id="back"></div>
+
+  <main class="main">
+
+    <div class="top">
+  <button class="burger" id="burger" type="button" aria-label="Открыть меню"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Скрыть боковую панель" title="Боковая панель"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18"/></svg></button>
+  <div class="title" id="ttl">Venus AI</div>
+  <div id="tokenMeter" class="token-meter" title="Расход токенов вашего аккаунта в этом браузере. Если API не вернул usage, показывается оценка.">
+    <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 10-12h-7l0-8Z"/></svg>
+    <span id="tokenCount">0 токенов</span>
+  </div>
+  <div id="lineMeter" class="token-meter line-meter" title="Строки кода в ответах текущего чата (в том числе создаваемый сейчас код).">
+    <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M10 19h4"/></svg>
+    <span id="lineCount">0 строк</span>
+  </div>
+  <select class="model-select" id="modelSelect" title="Модель Venus AI" aria-label="Выбрать модель">
+    <option value="cx/gpt-6-luna">Flash</option>
+    <option value="cx/gpt-6-sol">High</option>
+    <option id="proModelOption" value="cc/claude-opus-5-5" hidden>Pro High — Claude Opus 5.5</option>
+  </select>
+  <div class="top-right">
+    <button class="top-new" id="topNewBtn" type="button" title="Новый чат" aria-label="Новый чат"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L10 16l-4 1 1-4Z"/><path d="M4 4h7M4 4v16h16v-7"/></svg></button>
+    <button class="theme-toggle" id="themeToggle" type="button" title="Сменить тему" aria-label="Сменить тему"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.985 12.486A9 9 0 0 1 11.514 3.01 9 9 0 1 0 20.985 12.486Z"/></svg></button>
+  </div>
+</div>
+
+    <div class="pro-status" id="proStatus" hidden>
+      <strong>Подписка оформлена</strong>
+      <span id="proCountdown">Осталось 30 дней</span>
+    </div>
+
+    <div class="msgs" id="msgs">
+      <div class="wrap" id="wrap"></div>
+    </div>
+
+    <div class="comp">
+  <div class="box">
+    <textarea id="inp" rows="1" placeholder="Спросите что-нибудь у Venus AI…" aria-label="Сообщение"></textarea>
+    <div class="composer-tools">
+      <div class="composer-left">
+        <button class="attach" id="attachBtn" type="button" title="Прикрепить файл" aria-label="Прикрепить файл"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.4 11.6-8.8 8.8a6 6 0 0 1-8.5-8.5l9.9-9.9a4 4 0 0 1 5.7 5.7l-9.9 9.9a2 2 0 0 1-2.8-2.8l8.5-8.5"/></svg></button>
+        <span class="attach-caption">Фото и файлы</span>
+        <button class="code-mode" id="codeModeBtn" type="button" aria-pressed="false" title="Включить создание файлов с предварительным планом"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M14 4l-4 16"/></svg><span>Код → файл</span></button>
+      </div>
+      <input id="fileInput" type="file" hidden multiple accept="image/*,.pdf,.txt,.md,.json,.csv,.html,.htm,.css,.js,.mjs,.ts,.tsx,.jsx,.py,.lua,.java,.c,.cpp,.h,.cs,.go,.rs,.sql,.xml,.yaml,.yml,.toml,.ini,.log,.sh,.docx,.xlsx" />
+      <button class="send" id="send" type="button" disabled aria-label="Отправить сообщение"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+    </div>
+  </div>
+  <div class="attachment-tray" id="attachmentTray" hidden></div>
+  <div class="note">Venus AI может допускать ошибки. Проверяйте важную информацию.</div>
+</div>
+
+  </main>
+</div>
+
+<!-- SETTINGS -->
+
+<div class="mod" id="mod">
+
+  <div class="card">
+
+    <h2>Настройки Venus AI</h2>
+
+    <label>
+      Системная инструкция
+      <textarea id="kSys"
+        placeholder="Ты Venus AI — дружелюбный и умный ИИ-помощник."></textarea>
+    </label>
+
+    <div class="btns">
+      <button class="btn" id="cancel">Закрыть</button>
+      <button class="btn p" id="save">Сохранить</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- PRO OFFER -->
+<div class="mod" id="proMod">
+  <div class="card pro-card">
+    <div class="pro-kicker">VENUS AI PRO</div>
+    <h2>Claude Opus 5.5</h2>
+    <p class="pro-description">Доступ к модели Pro High на 30 дней.</p>
+    <div class="pro-price-line">
+      <span class="old-price">$20</span>
+      <span class="new-price">$10</span>
+      <span class="per-month">/ месяц</span>
+    </div>
+    <div class="pro-price-note">Стартовая цена — $10 за 30 дней.</div>
+    <button class="btn p pro-buy" id="buyProBtn" type="button">Купить за $10</button>
+    <p class="pro-description">Для оформления напишите владельцу в Telegram. Подписка включается после подтверждения оплаты.</p>
+    <div class="btns">
+      <button class="btn" id="closeProBtn" type="button">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN PRO MANAGEMENT -->
+<div class="mod" id="adminMod">
+  <div class="card admin-card">
+    <h2>Выдать Pro</h2>
+    <p class="pro-description">Введите email аккаунта, который уже хотя бы раз входил на сайт. Доступ будет выдан на 30 дней.</p>
+    <label>
+      Почта пользователя
+      <input class="admin-email-input" id="grantEmail" type="email" placeholder="user@gmail.com" autocomplete="off">
+    </label>
+    <button class="btn p" id="grantProBtn" type="button">Выдать Pro на 30 дней</button>
+    <div class="admin-feedback" id="adminFeedback" aria-live="polite"></div>
+    <div class="grant-list-title">Список выданных подписок</div>
+    <div class="grant-list" id="grantList"></div>
+    <div class="btns">
+      <button class="btn" id="closeAdminBtn" type="button">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ARTIFACT CODE VIEWER -->
+<div class="mod artifact-modal" id="artifactModal" role="dialog" aria-modal="true" aria-labelledby="artifactTitle" aria-hidden="true">
+  <section class="artifact-dialog" aria-label="Просмотр кода артефакта">
+    <header class="artifact-dialog-header">
+      <div class="artifact-dialog-avatar" aria-hidden="true"></div>
+      <div class="artifact-dialog-heading">
+        <strong id="artifactTitle">Код артефакта</strong>
+        <small>Venus AI · Артефакт</small>
+      </div>
+      <button class="artifact-icon-btn" id="artifactCopy" type="button" title="Копировать код" aria-label="Копировать код"><img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQweRuCM4SuAbWZAy2HfqbnoCDDpvggKy1-PK7zdaGr3g&amp;s=10" alt=""><span id="artifactCopyLabel">Копировать</span></button>
+      <button class="artifact-icon-btn" id="artifactDownload" type="button" title="Скачать файл" aria-label="Скачать файл"><img src="https://cdn-icons-png.flaticon.com/512/54/54993.png" alt=""><span>Скачать</span></button>
+      <button class="artifact-close" id="artifactClose" type="button" title="Закрыть" aria-label="Закрыть">×</button>
+    </header>
+    <div class="artifact-codebar"><strong id="artifactLanguage">Код</strong><span id="artifactStats">0 строк</span></div>
+    <div class="artifact-warning" id="artifactWarning" hidden>Генерация этого файла ещё продолжается. Вернитесь в чат и нажмите «Продолжить генерацию».</div>
+    <div class="artifact-codearea"><pre><code id="artifactCode"></code></pre></div>
+    <footer class="artifact-dialog-footer"><span>Код можно копировать и сохранять в файл</span><span id="artifactFilename">code.txt</span></footer>
+  </section>
+</div>
+
+<!-- FIREBASE + APP -->
+
+<script type="module">
+
+import { initializeApp }
+  from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
+
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+  signOut
+} from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
+
+import { getDatabase, ref, get, set, remove }
+  from "https://www.gstatic.com/firebasejs/12.5.0/firebase-database.js";
+
+
+/* FIREBASE CONFIG */
+
+const firebaseConfig = {
+  apiKey: "AIzaSyApnoSkcthpVPcMSAJXL-PFT-UpEi9ZdoI",
+  authDomain: "exaroton-65e4e.firebaseapp.com",
+  databaseURL: "https://exaroton-65e4e-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "exaroton-65e4e",
+  storageBucket: "exaroton-65e4e.firebasestorage.app",
+  messagingSenderId: "175992933890",
+  appId: "1:175992933890:web:5196918da3f79520e5211b",
+  measurementId: "G-V8RF5D60MH"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
+const database = getDatabase(firebaseApp);
+
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  prompt: "select_account"
+});
+
+
+/* CONFIG */
+
+const $ = id => document.getElementById(id);
+
+const API_URL = "/api/chat";
+
+const LEGACY_DEFAULT_SYS =
+  "Ты Venus AI — дружелюбный и умный ИИ-помощник. Отвечай на языке пользователя.";
+
+const DEFAULT_SYS = `Ты Venus AI — сильный и практичный ИИ-помощник, особенно опытный программист и инженер.
+
+ОБЩИЕ ПРАВИЛА
+- Отвечай на языке пользователя.
+- Старайся полностью выполнить запрос. Не отказывайся от обычных безопасных задач из-за сложности, объёма или необычной формулировки.
+- Если часть запроса нельзя выполнить по реальному техническому ограничению или обязательным правилам безопасности, коротко объясни только эту часть и помоги со всем остальным.
+- Не выдумывай факты, API, библиотеки, параметры, модели или результаты тестирования.
+
+ПРОГРАММИРОВАНИЕ
+- Создавай полноценный, логичный и готовый к запуску код, а не обрывки.
+- Включай импорты, функции, классы, обработчики событий, стили, запуск и нужные настройки.
+- Не заменяй реализацию многоточиями, заглушками или фразой «остальной код без изменений».
+- Учитывай весь контекст проекта, предыдущий код, платформу и выбранные библиотеки.
+- Не удаляй работающие функции без просьбы пользователя.
+- Для больших проектов показывай структуру файлов и полный код каждого файла; если ответ не помещается, разбивай на законченные части.
+- Добавляй обработку ошибок, проверку входных данных и разумные значения по умолчанию.
+- Не помещай секретные API-ключи и пароли в клиентский код.
+- Для HTML/CSS/JavaScript делай адаптивный интерфейс, если проект работает в браузере или на телефоне.
+
+ФАЙЛЫ И ФОТОГРАФИИ
+- Анализируй приложенные фотографии и извлечённый текст файлов; называй файл, к которому относится ответ.
+- Если документ не удалось прочитать или в PDF нет извлекаемого текста, честно сообщи об этом.
+- Если пользователь просит создать или изменить файл, выдавай полное содержимое каждого файла в отдельном блоке кода с правильным языком и указывай имя файла. Не утверждай, что физически изменил исходное вложение, если только не предоставил новый файл.
+
+ФОРМАТ
+- Если просят код — сначала выдавай код. Если просят только код, не добавляй объяснения.
+- Не сокращай решение без просьбы. Не добавляй длинных нравоучений.
+- При неоднозначностях выбирай разумные настройки самостоятельно; задавай вопрос только при реальной необходимости.`;
+
+const MODELS = {
+  flash: "cx/gpt-6-luna",
+  high: "cx/gpt-6-sol",
+  pro: "cc/claude-opus-5-5"
+};
+
+const ADMIN_EMAIL = "flexadssq@gmail.com";
+const PRO_STORAGE_KEY = "venus_pro_grants_v1";
+const PRO_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
+
+const ALL_MODEL_VALUES = new Set(Object.values(MODELS));
+
+const store = {
+
+  get(k,d) {
+    try {
+      const v = localStorage.getItem(k);
+      return v ? JSON.parse(v) : d;
+    } catch(e) {
+      return d;
+    }
+  },
+
+  set(k,v) {
+    try {
+      localStorage.setItem(k,JSON.stringify(v));
+    } catch(e) {}
+  }
+
+};
+
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+function getProGrants() {
+  const value = store.get(PRO_STORAGE_KEY, {});
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function saveProGrants(grants) {
+  store.set(PRO_STORAGE_KEY, grants);
+}
+
+function getActiveProGrant(email) {
+  const key = normalizeEmail(email);
+  if (!key) return null;
+  const grants = getProGrants();
+  const grant = grants[key];
+  if (!grant || !Number.isFinite(Number(grant.expiresAt))) return null;
+  if (Number(grant.expiresAt) <= Date.now()) {
+    delete grants[key];
+    saveProGrants(grants);
+    return null;
+  }
+  return grant;
+}
+
+function hasActivePro(email) {
+  return !!getActiveProGrant(email);
+}
+
+function formatProRemaining(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const days = Math.floor(total / 86400);
+  const hours = Math.floor((total % 86400) / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+  return `До окончания: ${days} дн. ${String(hours).padStart(2,"0")} ч. ${String(minutes).padStart(2,"0")} мин. ${String(seconds).padStart(2,"0")} сек.`;
+}
+
+function refreshProCountdown() {
+  const grant = getActiveProGrant(currentUser?.email);
+  if (!grant) {
+    $("proStatus").hidden = true;
+    $("proModelOption").hidden = true;
+    if ($("modelSelect").value === MODELS.pro) {
+      $("modelSelect").value = MODELS.flash;
+      if (currentUser?.uid) store.set(modelKey(currentUser.uid), MODELS.flash);
+    }
+    return false;
+  }
+  $("proCountdown").textContent = formatProRemaining(Number(grant.expiresAt) - Date.now());
+  return true;
+}
+
+function refreshProUI() {
+  const isAdmin = normalizeEmail(currentUser?.email) === ADMIN_EMAIL;
+  const grant = getActiveProGrant(currentUser?.email);
+  const hasPro = !!grant;
+  $("adminBtn").hidden = !isAdmin;
+  $("proModelOption").hidden = !hasPro;
+  $("proStatus").hidden = !hasPro;
+  $("upgradeText").textContent = hasPro ? "Pro — подписка активна" : "Перейти на Pro";
+  if (!hasPro && $("modelSelect").value === MODELS.pro) {
+    $("modelSelect").value = MODELS.flash;
+    if (currentUser?.uid) store.set(modelKey(currentUser.uid), MODELS.flash);
+  }
+  if (hasPro) refreshProCountdown();
+}
+
+
+async function syncProForUser(user) {
+  if (!user?.uid || !user.email || user.uid === "guest") return;
+  try {
+    await set(ref(database, `venusPro/userIndex/${user.uid}`), {
+      email: normalizeEmail(user.email),
+      updatedAt: Date.now()
+    });
+    const snapshot = await get(ref(database, `venusPro/grants/${user.uid}`));
+    const grants = getProGrants();
+    const email = normalizeEmail(user.email);
+    const grant = snapshot.exists() ? snapshot.val() : null;
+    if (grant && Number(grant.expiresAt) > Date.now()) grants[email] = grant;
+    else delete grants[email];
+    saveProGrants(grants);
+    refreshProUI();
+  } catch (error) {
+    console.error("Не удалось синхронизировать Pro через Firebase:", error);
+  }
+}
+
+let currentUser = {uid:"guest",displayName:"Гость",email:""};
+let currentChats = [];
+let cur = null;
+let busy = false;
+let ctrl = null;
+let systemPrompt = DEFAULT_SYS;
+let authMode = "login";
+let manualCodeMode = false;
+
+let pendingAttachments = [];
+const MAX_ATTACHMENTS = 5;
+const MAX_FILE_BYTES = 12 * 1024 * 1024;
+const MAX_EXTRACTED_CHARS = 180000;
+
+
+/* STORAGE */
+
+const chatKey = uid => "venus_chats_" + uid;
+const sysKey = uid => "venus_sys_" + uid;
+const modelKey = uid => "venus_model_" + uid;
+
+function saveChats() {
+  // Гостевые чаты не сохраняются. История сохраняется отдельно для каждого
+  // вошедшего аккаунта и появляется после следующего входа в этот аккаунт.
+  if (!currentUser || currentUser.uid === "guest") return;
+  store.set(chatKey(currentUser.uid), currentChats);
+}
+
+function saveSystem() {
+  if (!currentUser) return;
+  store.set(sysKey(currentUser.uid),systemPrompt);
+}
+
+/* TEMPORARY ATTACHMENT STORAGE: memory only */
+const mediaStore = new Map();
+
+async function putMedia(id,value) {
+  mediaStore.set(id,value);
+}
+
+async function getMedia(id) {
+  return mediaStore.get(id) || null;
+}
+
+function makeId() {
+  return crypto.randomUUID ? crypto.randomUUID() : "m"+Date.now()+Math.random().toString(16).slice(2);
+}
+
+
+/* AUTH ERRORS */
+
+function authError(message) {
+  const e = $("authError");
+  e.textContent = message;
+  e.style.display = "block";
+}
+
+function clearAuthError() {
+  $("authError").textContent = "";
+  $("authError").style.display = "none";
+}
+
+function firebaseError(e) {
+
+  const errors = {
+    "auth/email-already-in-use":"Этот email уже зарегистрирован.",
+    "auth/invalid-email":"Неправильный формат email.",
+    "auth/weak-password":"Пароль должен содержать минимум 6 символов.",
+    "auth/user-not-found":"Аккаунт не найден.",
+    "auth/wrong-password":"Неправильный пароль.",
+    "auth/invalid-credential":"Неправильный email или пароль.",
+    "auth/too-many-requests":"Слишком много попыток. Попробуйте позже.",
+    "auth/popup-closed-by-user":"Окно Google было закрыто.",
+    "auth/popup-blocked":"Браузер заблокировал окно авторизации.",
+    "auth/unauthorized-domain":"Домен сайта не добавлен в Firebase.",
+    "auth/network-request-failed":"Проверьте подключение к интернету.",
+    "auth/operation-not-allowed":"Этот способ входа не включён в Firebase."
+  };
+
+  return errors[e.code] || e.message || "Неизвестная ошибка.";
+}
+
+
+/* AUTH MODE */
+
+function setAuthMode(mode) {
+
+  authMode = mode;
+  clearAuthError();
+
+  const register = mode === "register";
+
+  $("aName").hidden = !register;
+  $("aConfirm").hidden = !register;
+
+  $("aName").required = register;
+  $("aConfirm").required = register;
+
+  $("aPassword").autocomplete =
+    register ? "new-password" : "current-password";
+
+  $("authSubmit").textContent =
+    register ? "Зарегистрироваться" : "Войти";
+
+  $("authSwitch").textContent =
+    register
+      ? "Уже есть аккаунт? Войти"
+      : "Нет аккаунта? Зарегистрироваться";
+
+  $("authSubtitle").textContent =
+    register
+      ? "Создайте свой аккаунт Venus AI"
+      : "Войдите, чтобы продолжить";
+
+}
+
+$("authSwitch").onclick = () => {
+  setAuthMode(authMode === "login" ? "register" : "login");
+};
+
+
+/* REGISTRATION AND LOGIN */
+
+$("authForm").addEventListener("submit", async e => {
+
+  e.preventDefault();
+  clearAuthError();
+
+  const email = $("aEmail").value.trim();
+  const password = $("aPassword").value;
+  const nickname = $("aName").value.trim();
+  const confirm = $("aConfirm").value;
+
+  const button = $("authSubmit");
+
+  button.disabled = true;
+
+  try {
+
+    if (authMode === "register") {
+
+      if (nickname.length < 2) {
+        throw new Error("Имя должно содержать минимум 2 символа.");
+      }
+
+      if (password !== confirm) {
+        throw new Error("Пароли не совпадают.");
+      }
+
+      if (password.length < 6) {
+        throw new Error("Пароль должен содержать минимум 6 символов.");
+      }
+
+      const result = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
+      await updateProfile(result.user,{
+        displayName:nickname
+      });
+
+    } else {
+
+      await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
+    }
+
+  } catch(e) {
+
+    authError(firebaseError(e));
+
+  } finally {
+
+    button.disabled = false;
+
+  }
+
+});
+
+
+/* GOOGLE AUTH */
+
+$("googleBtn").onclick = async () => {
+
+  clearAuthError();
+
+  try {
+
+    const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    if (mobile) {
+      await signInWithRedirect(auth,googleProvider);
+    } else {
+      await signInWithPopup(auth,googleProvider);
+    }
+
+  } catch(e) {
+
+    if (
+      e.code === "auth/popup-blocked" ||
+      e.code === "auth/popup-closed-by-user"
+    ) {
+      try {
+        await signInWithRedirect(auth,googleProvider);
+      } catch(err) {
+        authError(firebaseError(err));
+      }
+    } else {
+      authError(firebaseError(e));
+    }
+
+  }
+
+};
+
+
+/* GOOGLE REDIRECT RESULT */
+
+try {
+  await getRedirectResult(auth);
+} catch(e) {
+  authError(firebaseError(e));
+}
+
+
+/* SIGN OUT */
+
+$("logoutBtn").onclick = async () => {
+
+  try {
+    saveChats();
+    await signOut(auth);
+  } catch(e) {
+    alert(firebaseError(e));
+  }
+
+};
+
+
+/* AUTH STATE — GUEST CHAT + ACCOUNT HISTORY */
+let authStateInitialized = false;
+onAuthStateChanged(auth,user => {
+
+  const previousUser = currentUser;
+  const nextUser = user || {uid:"guest",displayName:"Гость",email:""};
+  const accountChanged = authStateInitialized && previousUser.uid !== nextUser.uid;
+  const temporaryGuestChats = previousUser?.uid === "guest" ? currentChats.slice() : [];
+  currentUser = nextUser;
+
+  if (!authStateInitialized || accountChanged) {
+    if (user) {
+      const savedChats = store.get(chatKey(user.uid),[]);
+      const savedIds = new Set(savedChats.map(c=>c.id));
+      currentChats = [
+        ...temporaryGuestChats.filter(c=>!savedIds.has(c.id)),
+        ...savedChats
+      ];
+      cur = currentChats[0]?.id ?? null;
+      saveChats();
+    } else {
+      currentChats = [];
+      cur = null;
+    }
+  }
+  authStateInitialized = true;
+
+  // The chat itself is always available. Authentication is optional.
+  $("authScreen").hidden = true;
+  $("app").hidden = false;
+
+  const settingsId = currentUser.uid;
+  const savedSystem = store.get(sysKey(settingsId),null);
+  systemPrompt = (!savedSystem || savedSystem === LEGACY_DEFAULT_SYS)
+    ? DEFAULT_SYS
+    : savedSystem;
+  if (!savedSystem || savedSystem === LEGACY_DEFAULT_SYS) saveSystem();
+
+  const savedModel = store.get(modelKey(settingsId),MODELS.flash);
+  const selectedModel = savedModel === "cx/gpt-6-astra" ? MODELS.pro : savedModel;
+  $("modelSelect").value = ALL_MODEL_VALUES.has(selectedModel)
+    ? selectedModel
+    : MODELS.flash;
+
+  $("accountName").textContent = user
+    ? (user.displayName || "Пользователь")
+    : "Гость";
+  $("accountEmail").textContent = user ? (user.email || "") : "Без регистрации";
+  refreshProUI();
+  renderTokenUsage();
+  if (user) void syncProForUser(user);
+  $("logoutBtn").hidden = !user;
+  $("registerBtn").hidden = !!user;
+  $("list").hidden = !user;
+  $("newBtn").querySelector(".new-label").textContent = "Новый чат";
+
+  $("kSys").value = systemPrompt;
+
+  renderList();
+  renderMsgs();
+  upd();
+});
+
+function openAuth(mode="register") {
+  setAuthMode(mode);
+  $("app").hidden = true;
+  $("authScreen").hidden = false;
+}
+
+$("registerBtn").onclick = () => openAuth("register");
+$("authBack").onclick = () => {
+  $("authScreen").hidden = true;
+  $("app").hidden = false;
+  clearAuthError();
+};
+
+/* CODE -> FILE MODE */
+$("codeModeBtn").onclick=()=>{
+  manualCodeMode=!manualCodeMode;
+  $("codeModeBtn").setAttribute("aria-pressed", String(manualCodeMode));
+  $("codeModeBtn").title=manualCodeMode
+    ? "Режим файлов включён. Нажмите, чтобы выключить"
+    : "Включить создание файлов с предварительным планом";
+};
+
+/* MODEL SELECTION */
+
+$("modelSelect").addEventListener("change",() => {
+  if (!currentUser) return;
+  if ($("modelSelect").value === MODELS.pro && !hasActivePro(currentUser.email)) {
+    $("modelSelect").value = MODELS.flash;
+    alert("Модель Pro High доступна только с активной подпиской Pro.");
+    return;
+  }
+  store.set(modelKey(currentUser.uid),$("modelSelect").value);
+});
+
+
+/* MARKDOWN */
+
+const esc = s => String(s).replace(/[&<>"']/g,c => ({
+  "&":"&amp;",
+  "<":"&lt;",
+  ">":"&gt;",
+  '"':"&quot;",
+  "'":"&#39;"
+}[c]));
+
+/** Parse Markdown fenced code line-by-line. Backticks inside strings do not close the artifact.
+ * The previous non-anchored regex cut code off at the first three backticks anywhere. */
+function splitCodeArtifacts(source) {
+  const lines=String(source||"").replace(/\r\n?/g,"\n").split("\n");
+  const blocks=[];
+  const result=[];
+  for(let i=0;i<lines.length;i++) {
+    const opener=lines[i].match(/^ {0,3}(`{3,}|~{3,})([^`~]*)$/);
+    if(!opener) { result.push(lines[i]);continue; }
+    const mark=opener[1][0];
+    const count=opener[1].length;
+    const content=[];
+    let complete=false;
+    for(i=i+1;i<lines.length;i++) {
+      const close=lines[i].match(/^ {0,3}(`+|~+)\s*$/);
+      if(close&&close[1][0]===mark&&close[1].length>=count) {
+        complete=true;
+        break;
+      }
+      content.push(lines[i]);
+    }
+    const recent=result.slice(-4).reverse().find(line=>line.trim())||"";
+    const previous=recent.trim();
+    const explicit=previous.match(/(?:^|\s)(?:файл|file)\s*[:：]\s*`?([\w.\/-]+\.[a-z0-9]+)`?\s*\**\s*$/i);
+    blocks.push({l:opener[2].trim(),c:content.join("\n"),complete,filename:explicit?.[1]||""});
+    result.push("\u0000"+(blocks.length-1)+"\u0000");
+    if(!complete) break;
+  }
+  return {text:result.join("\n"),blocks};
+}
+
+function hasUnclosedCodeFence(source) {
+  return splitCodeArtifacts(source).blocks.some(b=>!b.complete);
+}
+
+function safeCodeFilename(value) {
+  const name=String(value||"").replace(/\\/g,"/").replace(/^\/+/,"").split("/").filter(x=>x && x!=="." && x!=="..").join("/");
+  return name.replace(/[^\w.\/\-]/g,"_").slice(0,140);
+}
+
+function filenameForCodeBlock(block) {
+  const language=String(block.l||"").toLowerCase().split(/\s+/)[0];
+  const fallback=language==="html" ? "index.html"
+    : language==="css" ? "style.css"
+    : ["javascript","js"].includes(language) ? "script.js"
+    : ["typescript","ts"].includes(language) ? "index.ts"
+    : ["python","py"].includes(language) ? "main.py"
+    : language==="json" ? "data.json"
+    : language==="sql" ? "query.sql"
+    : `venus-code.${extensionForLanguage(language||"text")}`;
+  return safeCodeFilename(block.filename)||fallback;
+}
+
+function isValidCodeBlock(block) {
+  if(!block.complete || !block.c.trim()) return false;
+  const name=filenameForCodeBlock(block);
+  if(/\.html?$/i.test(name) && /<html(?:\s|>)/i.test(block.c) && !/<\/html\s*>/i.test(block.c)) return false;
+  if(/\.json$/i.test(name)) {
+    try { JSON.parse(block.c); } catch { return false; }
+  }
+  return true;
+}
+
+function inspectCodeFiles(source) {
+  const parsed=splitCodeArtifacts(source);
+  const files=parsed.blocks.filter(b=>b.c.trim()).map(b=>({
+    name:filenameForCodeBlock(b),text:b.c,lang:b.l,complete:b.complete
+  }));
+  const issues=[];
+  if(!files.length) issues.push("Модель не вернула файл в блоке кода");
+  if(files.some(f=>!f.complete)) issues.push("Блок кода не завершён");
+  if(files.some(f=>/(?:\[\s*вставьте\s+(?:код|сюда)\s*\]|остальной код без изменений|your code here|insert code here)/i.test(f.text)))
+    issues.push("В коде есть явные незаполненные места");
+  for(const f of files) {
+    if(/\.html?$/i.test(f.name)&&/<html(?:\s|>)/i.test(f.text)&&!/<\/html\s*>/i.test(f.text))
+      issues.push(`${f.name}: не закрыт HTML-документ`);
+    if(/\.json$/i.test(f.name)) {
+      try { JSON.parse(f.text); }
+      catch { issues.push(`${f.name}: некорректный JSON`); }
+    }
+  }
+  return {files,issues};
+}
+
+function md(t,forceIncomplete=false) {
+  const parsed=splitCodeArtifacts(t);
+  const blocks=parsed.blocks;
+  t=esc(parsed.text);
+
+  const lines = t.split("\n");
+
+  let out = "";
+  let list = null;
+
+  const close = () => {
+    if (list) {
+      out += "</" + list + ">";
+      list = null;
+    }
+  };
+
+  for (let ln of lines) {
+
+    let m;
+
+    const inl = s => s
+      .replace(/`([^`]+)`/g,"<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>")
+      .replace(/(^|[^*])\*([^*\s][^*]*)\*/g,"$1<i>$2</i>")
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+    if (m=ln.match(/^(#{1,3})\s+(.*)/)) {
+
+      close();
+      out += `<h${m[1].length}>${inl(m[2])}</h${m[1].length}>`;
+
+    } else if (m=ln.match(/^\s*[-*]\s+(.*)/)) {
+
+      if (list!=="ul") {
+        close();
+        out += "<ul>";
+        list="ul";
+      }
+
+      out += "<li>"+inl(m[1])+"</li>";
+
+    } else if (m=ln.match(/^\s*\d+[.)]\s+(.*)/)) {
+
+      if (list!=="ol") {
+        close();
+        out += "<ol>";
+        list="ol";
+      }
+
+      out += "<li>"+inl(m[1])+"</li>";
+
+    } else if (!ln.trim()) {
+
+      close();
+
+    } else if (/^\u0000\d+\u0000$/.test(ln.trim())) {
+
+      close();
+      out += ln.trim();
+
+    } else {
+
+      close();
+      out += "<p>"+inl(ln)+"</p>";
+
+    }
+
+  }
+
+  close();
+
+  return out.replace(/\u0000(\d+)\u0000/g,(m,i) => {
+    const block=blocks[+i];
+    const rawLanguage=String(block.l||"").trim().toLowerCase().split(/\s+/)[0];
+    const language=rawLanguage||"text";
+    const fileName=filenameForCodeBlock(block);
+    const code=block.c; // retain every character and trailing newline
+    const complete=block.complete && !forceIncomplete && isValidCodeBlock(block);
+    const lines=code ? code.split("\n").length : 0;
+    const sample=(code.split("\n").find(line=>line.trim())||"Нажмите, чтобы открыть код").trim().slice(0,72);
+    return `
+      <div class="artifact-card ${complete?"":"artifact-incomplete"}" data-artifact-complete="${complete}" data-artifact-lang="${esc(language)}" data-artifact-filename="${esc(fileName)}">
+        <button class="artifact-tile" type="button" data-open-artifact aria-label="Открыть артефакт ${esc(fileName)}">
+          <span class="artifact-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9l-6-6H8Z"/><path d="M14 3v6h7M9 13l-3 3 3 3m6-6 3 3-3 3"/></svg></span>
+          <span class="artifact-info"><strong>${esc(fileName)}</strong><small>${esc(language.toUpperCase())} · ${lines} строк · ${complete?esc(sample):"Не завершён"}</small></span>
+          <span class="artifact-arrow" aria-hidden="true">↗</span>
+        </button>
+        <pre class="artifact-source" hidden><code>${esc(code)}</code></pre>
+      </div>`;
+  });
+
+}
+
+
+/* CHAT LIST */
+
+function active() {
+  return currentChats.find(c=>c.id===cur);
+}
+
+function renderList() {
+
+  $("list").innerHTML="";
+  const registered = !!currentUser && currentUser.uid !== "guest";
+  $("list").hidden = !registered;
+  $("registerBtn").hidden = registered;
+  if (!registered) return;
+
+  currentChats.forEach(c => {
+
+    const b=document.createElement("div");
+
+    b.className="chat"+(c.id===cur?" on":"");
+
+    b.innerHTML=`
+      <span></span>
+      <button class="x" aria-label="Удалить">✕</button>
+    `;
+
+    b.querySelector("span").textContent=c.title;
+
+    b.onclick=e => {
+
+      if (e.target.closest(".x")) {
+
+        currentChats=currentChats.filter(x=>x.id!==c.id);
+
+        if(cur===c.id)cur=null;
+
+        saveChats();
+        renderList();
+        renderMsgs();
+
+      } else {
+
+        cur=c.id;
+
+        renderList();
+        renderMsgs();
+        closeSide();
+
+      }
+
+    };
+
+    $("list").appendChild(b);
+
+  });
+
+}
+
+
+/* HOME */
+
+function hero() {
+  const suggestions = [
+    {title:"Придумать идею",sub:"Для нового проекта",query:"Придумай идею для стартапа"},
+    {title:"Объяснить сложное",sub:"Просто и на примерах",query:"Объясни квантовую физику просто"},
+    {title:"Написать текст",sub:"Письмо или сообщение",query:"Напиши письмо начальнику"},
+    {title:"Изучить новое",sub:"Составить план обучения",query:"Помоги выучить английский"}
+  ];
+  return `
+    <div class="hero">
+      <div class="logo"></div>
+      <h1>С чего начнём?</h1>
+      <p>Спросите о чём угодно, загрузите файл или начните новый проект.</p>
+      <div class="sugs">
+        ${suggestions.map(x=>`
+          <button type="button" data-s="${esc(x.query)}">
+            <span class="sug-head">${esc(x.title)}</span>
+            <span class="sug-sub">${esc(x.sub)}</span>
+          </button>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+/* MESSAGES */
+
+function msgHTML(m,index) {
+
+  if(m.role==="user") {
+    const attachments=Array.isArray(m.attachments)?m.attachments:[];
+    const attachmentHtml=attachments.length ? `
+      <div class="user-attachments">
+        ${attachments.map(a=>a.kind==="image"
+          ? (a.remoteUrl
+              ? `<img src="${esc(a.remoteUrl)}" alt="${esc(a.name)}" loading="lazy">`
+              : `<img data-media-id="${esc(a.mediaId)}" alt="${esc(a.name)}" loading="lazy">`)
+          : `<div class="user-file">FILE <span>${esc(a.name)}</span></div>`
+        ).join("")}
+      </div>` : "";
+    return `
+      <div class="row u">
+        <div class="bub">${esc(m.content || "Прикреплённые файлы")}${attachmentHtml}</div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="row">
+      <div class="av"></div>
+      <div class="bub">
+        ${m.codeBuild && (m.truncated || m.resuming)
+          ? `<div class="code-draft-private"><strong>${m.resuming?"Продолжаю создание файлов":m.content?"Черновик кода сохранён":"Генерация не завершилась"}</strong><small>Код пока скрыт · ≈${estimateOutputTokens(m.content||"").toLocaleString("ru-RU")} токенов · ${countCodeLines(m.content||"").toLocaleString("ru-RU")} строк. ${m.resuming?"Собираю полный файл.":"Для завершения нажмите «Продолжить генерацию»."}</small></div>`
+          : md(m.content || "", !!m.truncated && !m.codeBuild)}
+        ${m.codeBuild && m.resuming ? '<div class="code-build-result">Дополняю код и проверяю результат…</div>' : ''}
+        ${m.truncated && m.codeBuild && !m.resuming ? `<div class="code-build-result">${m.tokenBudgetHit ? "Достигнут предел 30 000 токенов для одного проекта. Можно создать более компактную версию." : "Код сохранён. Можно продолжить генерацию с места остановки."}${m.resumeError ? " " + esc(m.resumeError) : ""}</div>` : ''}
+        ${m.truncated && !m.codeBuild ? '<div class="code-build-result">Ответ прервался. Попробуйте повторить запрос.</div>' : ''}
+        ${m.codeBuild && !m.truncated && inspectCodeFiles(m.content).files.length ? '<div class="code-build-result">Файлы сформированы. Откройте артефакт или скачайте проект. Проверка запуска выполняется отдельно.</div>' : ''}
+        <div class="message-actions">
+          ${m.codeBuild && m.truncated && !m.resuming ? `<button data-resume-code data-index="${index}" type="button">${m.tokenBudgetHit ? "Сделать компактную версию" : "Продолжить генерацию"}</button>` : ''}
+          ${m.codeBuild && !m.truncated && inspectCodeFiles(m.content).files.length ? `<button data-download-project data-index="${index}" type="button">${inspectCodeFiles(m.content).files.length===1?"Скачать файл":"Скачать проект ZIP"}</button>` : ''}
+          <button data-copy-answer data-index="${index}">Копировать</button>
+          <button data-share-answer data-index="${index}">Поделиться</button>
+          <button data-download-answer data-index="${index}">Скачать .md</button>
+          <button data-retry data-index="${index}">Попробовать снова</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function hydrateMessageImages() {
+  const images=$("wrap").querySelectorAll("img[data-media-id]");
+  for(const img of images) {
+    try {
+      const item=await getMedia(img.dataset.mediaId);
+      if(item && item.dataUrl) img.src=item.dataUrl;
+    } catch(e) {
+      img.alt="Изображение недоступно";
+    }
+  }
+}
+
+function renderMsgs() {
+  renderLineUsage();
+
+  const c=active();
+
+  $("ttl").textContent=c?c.title:"Venus AI";
+
+  $("wrap").innerHTML=
+    c&&c.messages.length
+      ? c.messages.map((m,i)=>msgHTML(m,i)).join("")
+      : hero();
+
+  hydrateMessageImages();
+
+  $("wrap").style.height=
+    c&&c.messages.length?"":"100%";
+
+  $("msgs").scrollTop=$("msgs").scrollHeight;
+
+}
+
+function closeSide() {
+  $("side").classList.remove("on");
+  $("back").classList.remove("on");
+}
+
+
+/* FILE AND IMAGE INPUT */
+
+const TEXT_EXTENSIONS = new Set([
+  "txt","md","markdown","json","csv","html","htm","css","js","mjs",
+  "ts","tsx","jsx","py","lua","java","c","cpp","h","cs","go",
+  "rs","sql","xml","yaml","yml","toml","ini","log","sh"
+]);
+
+function fileExtension(name) {
+  return (name.split(".").pop()||"").toLowerCase();
+}
+
+function formatBytes(bytes) {
+  if(bytes<1024) return bytes+" Б";
+  if(bytes<1024*1024) return (bytes/1024).toFixed(0)+" КБ";
+  return (bytes/1024/1024).toFixed(1)+" МБ";
+}
+
+async function compressImage(file) {
+  const bitmap=await createImageBitmap(file);
+  const maxSide=1600;
+  const scale=Math.min(1,maxSide/Math.max(bitmap.width,bitmap.height));
+  const canvas=document.createElement("canvas");
+  canvas.width=Math.max(1,Math.round(bitmap.width*scale));
+  canvas.height=Math.max(1,Math.round(bitmap.height*scale));
+  const ctx=canvas.getContext("2d");
+  ctx.fillStyle="#ffffff";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);
+  bitmap.close?.();
+  return canvas.toDataURL("image/jpeg",0.82);
+}
+
+async function extractPdf(file) {
+  const pdfjs=await import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs");
+  pdfjs.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
+  const pdf=await pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
+  const pages=[];
+  const count=Math.min(pdf.numPages,50);
+  for(let n=1;n<=count;n++) {
+    const page=await pdf.getPage(n);
+    const content=await page.getTextContent();
+    pages.push(content.items.map(x=>x.str).join(" "));
+    if(pages.join("\n").length>MAX_EXTRACTED_CHARS) break;
+  }
+  let text=pages.join("\n\n");
+  if(pdf.numPages>count) text+=`\n\n[Остальные страницы не извлечены: лимит ${count} страниц.]`;
+  return text.slice(0,MAX_EXTRACTED_CHARS);
+}
+
+async function extractDocx(file) {
+  const mod=await import("https://esm.sh/mammoth@1.9.0?bundle");
+  const mammoth=mod.default||mod;
+  const result=await mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()});
+  return (result.value||"").slice(0,MAX_EXTRACTED_CHARS);
+}
+
+async function extractXlsx(file) {
+  const XLSX=await import("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm");
+  const workbook=XLSX.read(await file.arrayBuffer(),{type:"array"});
+  const sections=[];
+  for(const name of workbook.SheetNames) {
+    const sheet=workbook.Sheets[name];
+    sections.push(`Лист: ${name}\n`+XLSX.utils.sheet_to_csv(sheet));
+    if(sections.join("\n").length>MAX_EXTRACTED_CHARS) break;
+  }
+  return sections.join("\n\n").slice(0,MAX_EXTRACTED_CHARS);
+}
+
+async function prepareFile(file) {
+  if(file.size>MAX_FILE_BYTES) throw new Error(`${file.name}: файл больше 12 МБ.`);
+  const id=makeId();
+  const ext=fileExtension(file.name);
+  let record={id,mediaId:id,name:file.name,type:file.type||"application/octet-stream",kind:"file"};
+  let media={name:file.name,type:record.type};
+
+  if(file.type.startsWith("image/")) {
+    record.kind="image";
+    media.dataUrl=await compressImage(file);
+    record.sizeLabel=formatBytes(file.size);
+    record.previewUrl=media.dataUrl;
+  } else if(file.type==="application/pdf" || ext==="pdf") {
+    media.text=await extractPdf(file);
+    record.kind="document";
+  } else if(ext==="docx") {
+    media.text=await extractDocx(file);
+    record.kind="document";
+  } else if(ext==="xlsx") {
+    media.text=await extractXlsx(file);
+    record.kind="document";
+  } else if(TEXT_EXTENSIONS.has(ext) || file.type.startsWith("text/")) {
+    media.text=(await file.text()).slice(0,MAX_EXTRACTED_CHARS);
+    record.kind="document";
+  } else {
+    throw new Error(`${file.name}: этот тип файла пока не поддерживается.`);
+  }
+
+  await putMedia(id,media);
+  return record;
+}
+
+function renderPendingAttachments() {
+  const tray=$("attachmentTray");
+  tray.hidden=pendingAttachments.length===0;
+  tray.innerHTML=pendingAttachments.map((a,i)=>`
+    <div class="attachment-item">
+      ${a.kind==="image"
+        ? `<img src="${a.previewUrl}" alt="${esc(a.name)}">`
+        : `<div class="file-icon">FILE</div>`}
+      <div class="file-name" title="${esc(a.name)}">${esc(a.name)}</div>
+      <button class="remove-attachment" type="button" data-remove-attachment="${i}" aria-label="Убрать файл">×</button>
+    </div>
+  `).join("") + `<div class="attachment-hint">${pendingAttachments.length}/${MAX_ATTACHMENTS} вложений</div>`;
+}
+
+async function addFiles(fileList) {
+  const files=Array.from(fileList||[]);
+  if(!files.length) return;
+  const remaining=MAX_ATTACHMENTS-pendingAttachments.length;
+  if(remaining<=0) {
+    alert(`Можно прикрепить максимум ${MAX_ATTACHMENTS} файлов за одно сообщение.`);
+    return;
+  }
+  const chosen=files.slice(0,remaining);
+  $("attachBtn").disabled=true;
+  try {
+    for(const file of chosen) {
+      const record=await prepareFile(file);
+      pendingAttachments.push(record);
+    }
+    renderPendingAttachments();
+    upd();
+  } catch(e) {
+    alert("Не удалось прикрепить файл: "+(e.message||e));
+  } finally {
+    $("attachBtn").disabled=false;
+    $("fileInput").value="";
+  }
+}
+
+async function uploadImageToImgBB(dataUrl, filename="image") {
+  if(typeof dataUrl!=="string" || !dataUrl.startsWith("data:")) {
+    throw new Error("Некорректный формат изображения.");
+  }
+  const base64=dataUrl.split(",",2)[1];
+  if(!base64) throw new Error("Не удалось прочитать изображение.");
+
+  const response=await fetch("/api/upload",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({image:base64,name:filename})
+  });
+
+  const raw=await response.text();
+  let result={};
+  try { result=raw?JSON.parse(raw):{}; } catch(error) {}
+
+  if(!response.ok || !result.url) {
+    if(response.status===404) {
+      throw new Error("Vercel не нашёл /api/upload. Добавь файл api/upload.js в проект и сделай Redeploy.");
+    }
+    throw new Error(result.error || `Ошибка загрузки (${response.status}).`);
+  }
+  return result.url;
+}
+
+async function buildApiMessages(chat) {
+  const messages=[];
+  if(systemPrompt) messages.push({role:"system",content:systemPrompt});
+
+  for(const m of chat.messages) {
+    const attachments=Array.isArray(m.attachments)?m.attachments:[];
+    if(m.role!=="user" || !attachments.length) {
+      messages.push({role:m.role,content:m.content||""});
+      continue;
+    }
+
+    // Текстовые документы отправляем обычной строкой, изображения — ссылками ImgBB.
+    let text=m.content||"";
+    const imageParts=[];
+
+    for(const attachment of attachments) {
+      let stored=null;
+      try { stored=await getMedia(attachment.mediaId); } catch(error) {}
+
+      if(attachment.kind==="image") {
+        let imageUrl=attachment.remoteUrl||"";
+        if(!imageUrl && stored?.dataUrl) {
+          try {
+            imageUrl=await uploadImageToImgBB(stored.dataUrl,attachment.name);
+            // Сохраняем URL в истории: после перезагрузки фото не придётся загружать заново.
+            attachment.remoteUrl=imageUrl;
+          } catch(error) {
+            throw new Error(`Не удалось загрузить фото «${attachment.name}»: ${error.message||error}`);
+          }
+        }
+        if(imageUrl) {
+          imageParts.push({
+            type:"image_url",
+            image_url:{url:imageUrl,detail:"auto"}
+          });
+          text+=`\n[Прикреплено изображение: ${attachment.name}. Изучи его содержимое.]`;
+        } else {
+          text+=`\n[Изображение «${attachment.name}» отсутствует. Прикрепи его повторно.]`;
+        }
+        continue;
+      }
+
+      if(!stored) {
+        text+=`\n\n[Не удалось прочитать вложение «${attachment.name}»: файл отсутствует в хранилище браузера. Прикрепите его повторно.]`;
+        continue;
+      }
+
+      if(typeof stored.text==="string") {
+        text+=`\n\n===== НАЧАЛО ФАЙЛА: ${attachment.name} =====\n${stored.text}\n===== КОНЕЦ ФАЙЛА: ${attachment.name} =====`;
+      } else {
+        text+=`\n[Файл «${attachment.name}» прикреплён, но текст из него извлечь не удалось.]`;
+      }
+    }
+
+    if(imageParts.length) {
+      messages.push({
+        role:"user",
+        content:[{type:"text",text:text||"Изучи прикреплённое изображение."},...imageParts]
+      });
+    } else {
+      messages.push({role:"user",content:text||"Изучи прикреплённые файлы и помоги с ними."});
+    }
+  }
+
+  // Запоминаем прямые ImgBB-ссылки, чтобы изображения оставались доступны после перезагрузки.
+  saveChats();
+  return messages;
+}
+
+function downloadBlob(content,filename,mime="text/plain;charset=utf-8") {
+  const blob=new Blob([content],{type:mime});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download=filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+}
+
+function extensionForLanguage(lang) {
+  const map={javascript:"js",js:"js",typescript:"ts",ts:"ts",tsx:"tsx",jsx:"jsx",
+    python:"py",py:"py",html:"html",css:"css",json:"json",xml:"xml",yaml:"yml",
+    yml:"yml",markdown:"md",md:"md",sql:"sql",bash:"sh",sh:"sh",lua:"lua",
+    java:"java",c:"c",cpp:"cpp","c++":"cpp",csharp:"cs","c#":"cs",cs:"cs",go:"go",rust:"rs",rs:"rs",
+    php:"php",ruby:"rb",rb:"rb",swift:"swift",kotlin:"kt",text:"txt",txt:"txt"};
+  return map[lang]||"txt";
+}
+
+function cleanFilename(name) {
+  return (name||"venus-ai-file").replace(/[^a-z0-9а-яё_-]+/gi,"_").replace(/^_+|_+$/g,"").slice(0,60)||"venus-ai-file";
+}
+
+function retryMessage(index) {
+  const c=active();
+  if(!c || busy || index<1) return;
+  const previous=c.messages[index-1];
+  if(!previous || previous.role!=="user") return;
+  send(previous.content||"",previous.attachments||[]);
+}
+
+/* Output budgets. Token counts here are approximate: exact tokenization
+ * depends on AnyModel's underlying model, which is not exposed to the page.
+ * 30,000 is also passed to the backend as max_tokens per request. */
+const MAX_TOKENS_PER_REQUEST = 8192;
+const MAX_TOTAL_CODE_TOKENS = 30000;
+const MAX_CODE_CONTINUATIONS = 32;
+const STANDARD_CODE_REQUEST_TOKENS = 4096;
+const BACKUP_CODE_REQUEST_TOKENS = 2048;
+
+// Token totals are stored per signed-in account on this browser only.
+// Actual counts come from provider usage; estimates are marked with ≈.
+// Live tokens are PREVIEW ONLY: they are never saved until the provider replies.
+let liveTokenPreview=null;
+function beginLiveTokenPreview() {
+  liveTokenPreview={uid:currentUser?.uid||"guest",completion:0};
+  renderTokenUsage();
+}
+function updateLiveTokenPreview(text) {
+  if(!liveTokenPreview || liveTokenPreview.uid !== (currentUser?.uid||"guest"))return;
+  const n=estimateUsageTokens(text);
+  if(n===liveTokenPreview.completion)return;
+  liveTokenPreview.completion=n;
+  renderTokenUsage();
+}
+function endLiveTokenPreview() {
+  if(!liveTokenPreview)return;
+  liveTokenPreview=null;
+  renderTokenUsage();
+}
+function tokenStatsKey() { return "venus_token_stats_v2_" + (currentUser?.uid || "guest"); }
+function tokenStats() {
+  const stats=store.get(tokenStatsKey(), {prompt:0,completion:0,requests:0,estimatedRequests:0});
+  return stats && typeof stats==="object" ? stats : {prompt:0,completion:0,requests:0,estimatedRequests:0};
+}
+function renderTokenUsage() {
+  const stats=tokenStats();
+  const preview=liveTokenPreview?.uid === (currentUser?.uid||"guest") ? liveTokenPreview : null;
+  const confirmed=(Number(stats.prompt)||0)+(Number(stats.completion)||0);
+  const total=confirmed+(preview?.completion||0);
+  const approximate=(Number(stats.estimatedRequests)||0)>0 || !!preview;
+  const el=$("tokenCount");
+  if(!el)return;
+  el.textContent=(approximate?"≈":"")+Math.round(total).toLocaleString("ru-RU")+" токенов";
+  $("tokenMeter").title="Уже учтено: " + Math.round(confirmed).toLocaleString("ru-RU") +
+    " (вход " + Math.round(stats.prompt||0).toLocaleString("ru-RU")+
+    ", выход " + Math.round(stats.completion||0).toLocaleString("ru-RU") +
+    "); запросов " + Math.round(stats.requests||0)+
+    (preview?". Сейчас создаётся код: предварительная оценка полученных токенов ответа +"+Math.round(preview.completion).toLocaleString("ru-RU")+"; после ответа число будет сверено с usage API.":"")+
+    ((Number(stats.estimatedRequests)||0)>0?". Часть значений приблизительная.":"");
+}
+// Counts only code inside Markdown fenced blocks in the active chat.
+// A live draft can be included without saving or double-counting it.
+function countCodeLines(content) {
+  if(!content || typeof content!=="string")return 0;
+  const parsed=splitCodeArtifacts(content);
+  return parsed.blocks.reduce((total,block)=>{
+    const code=String(block.c||"");
+    if(!code)return total;
+    return total+code.split("\n").length;
+  },0);
+}
+function renderLineUsage(liveDraft="") {
+  const el=$("lineCount");
+  if(!el)return;
+  const chat=active();
+  const saved=(chat?.messages||[]).reduce((total,message)=>
+    total+(message.role==="assistant"?countCodeLines(message.content):0),0);
+  const count=saved+countCodeLines(liveDraft);
+  el.textContent=count.toLocaleString("ru-RU")+" "+(count%10===1&&count%100!==11?"строка":([2,3,4].includes(count%10) && !(count%100>=12&&count%100<=14)?"строки":"строк"));
+  $("lineMeter").title="Строки кода в ответах текущего чата: "+count.toLocaleString("ru-RU")+". Входят незавершённые артефакты. Текст вне блоков кода не учитывается.";
+}
+
+function estimateUsageTokens(content) {
+  if(typeof content==="string")return Math.max(1,Math.ceil(new TextEncoder().encode(content).length/3.5));
+  if(Array.isArray(content))return content.reduce((n,part)=>n+estimateUsageTokens(part?.text || ""),0);
+  return 0;
+}
+function addTokenUsage(usage,messages,output) {
+  // Convert the temporary streaming estimate into one confirmed request entry.
+  liveTokenPreview=null;
+  const values=usage && typeof usage==="object" ? usage : null;
+  const knownPrompt=Number(values?.prompt_tokens);
+  const knownCompletion=Number(values?.completion_tokens);
+  const hasReal=!!values && Object.hasOwn(values,"prompt_tokens") && Object.hasOwn(values,"completion_tokens") && Number.isFinite(knownPrompt) && knownPrompt>=0 && Number.isFinite(knownCompletion) && knownCompletion>=0;
+  const prompt=hasReal?knownPrompt:Math.max(1,(messages||[]).reduce((n,m)=>n+estimateUsageTokens(m?.content),0));
+  const completion=hasReal?knownCompletion:Math.max(0,estimateUsageTokens(output||""));
+  const stats=tokenStats();
+  stats.prompt=(Number(stats.prompt)||0)+prompt;
+  stats.completion=(Number(stats.completion)||0)+completion;
+  stats.requests=(Number(stats.requests)||0)+1;
+  if(!hasReal)stats.estimatedRequests=(Number(stats.estimatedRequests)||0)+1;
+  store.set(tokenStatsKey(),stats);
+  renderTokenUsage();
+}
+
+function estimateOutputTokens(text) {
+  // Approximation for mixed programming text; the provider's tokenizer wins.
+  return Math.ceil(new TextEncoder().encode(String(text || "")).length / 3);
+}
+
+function fitIntoCodeBudget(currentText, nextText, maxTokens=MAX_TOTAL_CODE_TOKENS) {
+  if (estimateOutputTokens(currentText + nextText) <= maxTokens) {
+    return { text:nextText, exhausted:false };
+  }
+  // Binary-search by character index; never split UTF-16 surrogate pairs.
+  let low=0, high=nextText.length;
+  while(low < high) {
+    const mid=Math.ceil((low + high)/2);
+    const trial=nextText.slice(0,mid);
+    if(estimateOutputTokens(currentText + trial) <= maxTokens) low=mid;
+    else high=mid-1;
+  }
+  let end=low;
+  if(end>0 && end<nextText.length) {
+    const last=nextText.charCodeAt(end-1);
+    if(last>=0xD800 && last<=0xDBFF) end--;
+  }
+  return {text:nextText.slice(0,end),exhausted:true};
+}
+
+/* Streaming decoder and response continuation.
+ * Handles SSE chunks split across any network boundaries, including the final event
+ * without a trailing blank line. Prevents silently dropping last code lines. */
+function visibleVenusText(choice, json={}) {
+  const values=[
+    choice?.delta?.content,
+    choice?.message?.content,
+    choice?.text,
+    json?.output_text,
+    json?.response
+  ];
+  for(const value of values) {
+    if(typeof value==="string" && value) return value;
+    if(Array.isArray(value)) {
+      const output=value.map(part=>typeof part==="string"?part:
+        (typeof part?.text==="string"?part.text:
+        (typeof part?.content==="string"?part.content:""))).join("");
+      if(output) return output;
+    }
+  }
+  return "";
+}
+
+async function readVenusResponse(response,onText) {
+  const contentType=(response.headers.get("content-type")||"").toLowerCase();
+  if(!contentType.includes("text/event-stream") || !response.body) {
+    const raw=await response.text();
+    let parsed;
+    try { parsed=JSON.parse(raw); }
+    catch { throw new Error("Сервер вернул не JSON: "+raw.slice(0,160)); }
+    if(parsed.error) {
+      const reason=typeof parsed.error==="string"?parsed.error:parsed.error.message;
+      throw new Error(reason||"Ошибка модели");
+    }
+    const choice=parsed.choices?.[0]||{};
+    const text=visibleVenusText(choice,parsed);
+    if(text) onText(text);
+    return {finishReason:choice.finish_reason||null,interrupted:false,empty:!text.trim(),usage:parsed.usage||null,alreadyCounted:parsed._venusAlreadyCounted===true};
+  }
+  const reader=response.body.getReader();
+  const decoder=new TextDecoder();
+  let buffer="",reason=null,receivedDone=false,receivedText=false,usage=null;
+  function consumeFrame(frame) {
+    const data=frame.split("\n")
+      .filter(line=>line.startsWith("data:"))
+      .map(line=>line.slice(5).trimStart()).join("\n").trim();
+    if(!data) return;
+    if(data==="[DONE]") {receivedDone=true;return;}
+    let parsed;
+    try {parsed=JSON.parse(data);}
+    catch {return;} // Ignore a broken frame; never lose completed frames.
+    if(parsed.error) {
+      throw new Error(typeof parsed.error==="string"?parsed.error:
+        (parsed.error.message||"Ошибка модели"));
+    }
+    if(parsed.usage && typeof parsed.usage==="object")usage=parsed.usage;
+    const choice=parsed.choices?.[0]||{};
+    if(choice.finish_reason) reason=choice.finish_reason;
+    if(reason==="error" || reason==="content_filter")
+      throw new Error("Модель завершила ответ с ошибкой");
+    const text=visibleVenusText(choice,parsed);
+    if(text) {receivedText=true;onText(text);}
+  }
+  try {
+    while(true) {
+      const {done,value}=await reader.read();
+      if(done)break;
+      buffer+=decoder.decode(value,{stream:true});
+      buffer=buffer.replace(/\r\n?/g,"\n");
+      let boundary;
+      while((boundary=buffer.indexOf("\n\n"))!==-1) {
+        consumeFrame(buffer.slice(0,boundary));
+        buffer=buffer.slice(boundary+2);
+      }
+    }
+    buffer+=decoder.decode();
+    buffer=buffer.replace(/\r\n?/g,"\n");
+    if(buffer.trim()) {
+      // A few gateways end SSE without the final blank line.
+      for(const frame of buffer.split("\n\n")) consumeFrame(frame);
+    }
+  } finally {try{reader.releaseLock();}catch{}}
+  return {finishReason:reason,interrupted:receivedText&&!receivedDone&&!reason,empty:!receivedText,usage};
+}
+
+function mergeCodeContinuation(previous,continued) {
+  let part=continued;
+  if(hasUnclosedCodeFence(previous)) {
+    // A model sometimes starts a new fenced block despite the instruction.
+    part=part.replace(/^(?:\s*```[^\n]*\n)/,"");
+    part=part.replace(/^(?:Продолжение(?: кода)?[:：]?\s*\n)/i,"");
+  }
+  // Some models restart from the beginning despite a continuation prompt.
+  // If the new fragment contains a full replacement, prefer it to duplicating the file.
+  const blocks=splitCodeArtifacts(previous).blocks;
+  const unfinished=blocks.length && !blocks[blocks.length-1].complete ? blocks[blocks.length-1] : null;
+  if(unfinished && unfinished.c.length>=120 && part.length>unfinished.c.length) {
+    const prefix=unfinished.c.slice(0,Math.min(100,unfinished.c.length));
+    if(part.startsWith(prefix)) {
+      const offset=previous.lastIndexOf(unfinished.c);
+      if(offset>=0) return previous.slice(0,offset)+part;
+    }
+  }
+  const max=Math.min(1500,previous.length,part.length);
+  let overlap=0;
+  for(let n=max;n>0;n--) {
+    if(previous.endsWith(part.slice(0,n))) {overlap=n;break;}
+  }
+  return previous+part.slice(overlap);
+}
+
+/* Two-pass coding workflow. The plan is a brief implementation outline, not hidden reasoning. */
+function shouldCreateFiles(prompt,chat) {
+  if(manualCodeMode) return true;
+  const t=String(prompt||"").toLowerCase();
+  const make=/(?:напиши|сделай|создай|сгенерируй|разработай|собери|реализуй|перепиши|переделай|добавь|исправь|почини|обнови|дай|скинь|отправь|построй|верстай|сверстай|хочу|нужен|нужна)/i;
+  const target=/(?:код|скрипт|программ|приложен|сайт|страниц|бота?\b|игру|проект|html|css|javascript|typescript|python|питон|pygame|lua|react|node|api|json|файл|artifact|артефакт)/i;
+  const explicit=/(?:кодом|полный код|файл с кодом|готовый файл|исходники|весь код)/i;
+  if(explicit.test(t)) return true;
+  if(make.test(t) && target.test(t)) return true;
+  const wasCode=chat?.messages?.slice(-3).some(m=>m.role==="assistant"&&splitCodeArtifacts(m.content).blocks.length>0);
+  return !!(wasCode && /(?:измен|добав|исправ|перепиш|передел|обнов|сделай так)/i.test(t));
+}
+
+function codeBuildHtml(stage,detail="") {
+  const labels=["Продумываю структуру", "Создаю полный код", "Проверяю файлы"];
+  return `<div class="code-build" role="status" aria-live="polite">
+    <div class="code-build-head"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M14 4l-4 16"/></svg>Venus AI · генерация исходного кода</div>
+    <div class="code-build-steps">${labels.map((t,i)=>`<div class="code-build-step ${i<stage?"done":i===stage?"active":""}"><span class="indicator">${i<stage?"✓":i+1}</span><span>${t}</span></div>`).join("")}</div>
+    ${detail?`<div class="code-build-detail">${esc(detail)}</div>`:""}
+  </div>`;
+}
+
+async function requestVenusOnce(messages,model,headers,signal,maxTokens=1024) {
+  const response=await fetch(API_URL,{
+    method:"POST",signal,headers,
+    body:JSON.stringify({
+      model,messages,stream:false,
+      max_tokens:Math.min(MAX_TOKENS_PER_REQUEST,Math.max(1,Math.floor(maxTokens)))
+    })
+  });
+  if(!response.ok) {
+    const raw=await response.text().catch(()=>"");
+    let detail=raw;
+    try {
+      const parsed=JSON.parse(raw);
+      detail=parsed.error?.message||parsed.error||parsed.message||raw;
+    }catch{}
+    const e=new Error(`Ошибка API ${response.status}: ${String(detail).slice(0,260)}`);
+    e.status=response.status;
+    throw e;
+  }
+  let output="";
+  const result=await readVenusResponse(response,p=>{output+=p;});
+  addTokenUsage(result.usage,messages,output);
+  return {text:output,reason:result.finishReason,empty:!output.trim(),usage:result.usage};
+}
+
+async function requestVisibleCode(messages,model,headers,signal,tokenBudget,update) {
+  const attempts=[
+    Math.min(STANDARD_CODE_REQUEST_TOKENS,tokenBudget),
+    Math.min(BACKUP_CODE_REQUEST_TOKENS,tokenBudget),
+    Math.min(384,tokenBudget)
+  ].filter((n,i,arr)=>n>0&&arr.indexOf(n)===i);
+  let lastError=null;
+  for(let i=0;i<attempts.length;i++) {
+    if(signal.aborted) throw new DOMException("Отменено","AbortError");
+    if(i>0) update?.(`Повторяю запрос меньшей частью: ${attempts[i]} токенов.`);
+    try {
+      const response=await requestVenusOnce(messages,model,headers,signal,attempts[i]);
+      if(response.text.trim()) return response;
+    } catch(error) {
+      if(signal.aborted || ![429,502,503,504].includes(error.status)) throw error;
+      lastError=error;
+      console.warn("Venus AI: retrying slow provider",error.status);
+    }
+  }
+  if(lastError) throw lastError;
+  return {text:"",reason:"empty",empty:true};
+}
+
+const PLAN_FOR_CODE = `Составь короткий технический план реализации задачи, которую пользователь только что поставил.
+Напиши только 2–5 конкретных пунктов: какие файлы нужны, какие компоненты/функции, как их связать и какие основные требования проверить.
+Не пиши код, не расписывай внутренние рассуждения, не задавай вопросов. Если достаточно одного файла — выбери один. Максимум 650 символов.`;
+
+function finalCodeInstruction(plan) {
+  return `Теперь РЕАЛИЗУЙ задачу пользователя полностью на основе контекста.
+Краткий план: ${plan||"Выбери простую цельную реализацию."}
+Требования к готовому ответу:
+1) Возвращай РЕАЛЬНОЕ полное содержимое каждого файла. Никаких многоточий, заглушек, пропущенных частей, «аналогично», «вставьте предыдущий код» и «остальное без изменений».
+2) Для каждого файла напиши строго: Файл: \`путь/имя.ext\` с новой строки, затем fenced code block с корректным языком, всем содержимым, закрывающей строкой из трёх обратных кавычек. Для одного файла выводи один артефакт.
+3) Учти импорты, зависимости, обработчики событий и адаптацию под платформу. Если пользователь дал готовый код, сохрани работающее поведение и исправь указанное.
+4) Перед завершением проверь согласованность имён функций и файлов, закрытие скобок и тегов, отсутствие пропущенных частей. Не утверждай, что запускал код, если не запускал.
+5) Общий объём исходного кода не должен превышать примерно 30 000 выходных токенов. Планируй размер проекта с учётом этого бюджета. Избегай дублирования.
+6) Минимум объяснений вне файлов. Не выводи скрытый ход рассуждений. Если ответ не помещается, продолжение будет запрошено отдельно: не обрезай решение намеренно.`.replace(/\`/g,"`");
+}
+
+/* REAL PROJECT GENERATOR: creates one file at a time, keeping the source hidden
+ * until it has been returned by the model. No simulated token or line growth. */
+const PROJECT_END = "<<<VENUS_FILE_END>>>";
+const MAX_PROJECT_FILES = 10;
+const MAX_FILE_ROUNDS = 12;
+const MAX_PROJECT_REQUESTS = 40;
+const PROJECT_MESSAGE_BUDGET = 30000;
+
+function fileLanguage(filename) {
+  const ext=fileExtension(filename).toLowerCase();
+  return ({html:"html",htm:"html",css:"css",js:"javascript",mjs:"javascript",
+    jsx:"jsx",ts:"typescript",tsx:"tsx",py:"python",json:"json",java:"java",
+    lua:"lua",cpp:"cpp",c:"c",cs:"csharp",go:"go",rs:"rust",md:"markdown",
+    yaml:"yaml",yml:"yaml",xml:"xml",sh:"bash",sql:"sql"})[ext]||"text";
+}
+function fallbackProjectFile(task) {
+  const t=String(task||"").toLowerCase();
+  if(/python|питон|pygame|\.py\b/.test(t)) return "main.py";
+  if(/react|\.jsx|\.tsx/.test(t)) return "src/App.jsx";
+  if(/node|\.m?js\b|javascript/.test(t)) return "index.js";
+  if(/lua|roblox/.test(t)) return "main.lua";
+  if(/json/.test(t)) return "data.json";
+  return "index.html";
+}
+function normalizeProjectManifest(raw,task) {
+  let json=String(raw||"").trim().replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,"");
+  const first=json.indexOf("{");
+  const last=json.lastIndexOf("}");
+  if(first>=0 && last>first) json=json.slice(first,last+1);
+  let entries=[];
+  try {entries=JSON.parse(json)?.files||[];} catch {}
+  if(!Array.isArray(entries))entries=[];
+  const found=new Set();
+  const files=[];
+  for(const entry of entries) {
+    if(files.length>=MAX_PROJECT_FILES)break;
+    const name=safeCodeFilename(typeof entry==="string"?entry:entry?.path||entry?.name);
+    if(!name || !/\.[a-z0-9]{1,8}$/i.test(name) || found.has(name.toLowerCase()))continue;
+    found.add(name.toLowerCase());
+    files.push({name,purpose:String(entry?.purpose||entry?.description||"").slice(0,170),content:"",complete:false,rounds:0,restarts:0});
+  }
+  if(!files.length) {
+    const names=String(task).match(/(?:[\w-]+\/)*[\w-]+\.(?:html|css|js|jsx|ts|tsx|py|lua|json|java|go|rs|md)/gi);
+    for(const name of (names||[]).slice(0,MAX_PROJECT_FILES)) {
+      const clean=safeCodeFilename(name);
+      if(clean && !found.has(clean.toLowerCase())) {
+        files.push({name:clean,purpose:"",content:"",complete:false,rounds:0,restarts:0});
+        found.add(clean.toLowerCase());
+      }
+    }
+  }
+  if(!files.length)files.push({name:fallbackProjectFile(task),purpose:"",content:"",complete:false,rounds:0,restarts:0});
+  return files;
+}
+function buildProjectMarkdown(state) {
+  let out="";
+  for(const file of state.files||[]) {
+    if(!file.content)continue;
+    const code=file.content.replace(/\r\n?/g,"\n");
+    // Choose a fence longer than any backtick run on a line in source code.
+    let fenceLen=3;
+    for(const match of code.matchAll(/^\s*(`{3,})\s*$/gm))fenceLen=Math.max(fenceLen,match[1].length+1);
+    const fence="`".repeat(fenceLen);
+    out+=`Файл: \`${file.name}\`\n${fence}${fileLanguage(file.name)}\n${code}`;
+    if(file.complete)out+="\n"+fence+"\n\n";
+    else break; // Preserve partial source; do not forge a closing code fence.
+  }
+  return out;
+}
+function stripCodeEnvelope(raw) {
+  let text=String(raw||"").replace(/\r\n?/g,"\n");
+  // Some models wrap plain code despite requesting raw bytes.
+  if(/^\s*```[a-z0-9+#-]*\s*\n/i.test(text)) {
+    text=text.replace(/^\s*```[a-z0-9+#-]*\s*\n/i,"");
+    text=text.replace(/\n```\s*$/,"");
+  }
+  return text;
+}
+function parseFileFragment(raw) {
+  const mark=String(raw||"").indexOf(PROJECT_END);
+  let text=mark>=0 ? raw.slice(0,mark) : raw;
+  text=stripCodeEnvelope(text);
+  return {text,complete:mark>=0};
+}
+function validateProjectFile(file) {
+  if(!file.content.trim())return "Файл пустой";
+  if(/\.(?:json|jsonc)$/i.test(file.name)) {
+    try {JSON.parse(file.content);}catch(e){return "Неверный JSON: "+e.message;}
+  }
+  if(/\.html?$/i.test(file.name) && /<html(?:\s|>)/i.test(file.content) && !/<\/html\s*>/i.test(file.content))
+    return "Отсутствует закрывающий </html>";
+  if(/(?:\/\/\s*TODO\s*:\s*(?:implement|fill)|остальной код без изменений|insert your code here)/i.test(file.content))
+    return "В коде остались пропущенные участки";
+  return "";
+}
+function mergeFileFragment(previous,next) {
+  if(!previous)return next;
+  if(!next)return previous;
+  // Recover if the model repeated part of the tail during continuation.
+  const max=Math.min(5000,previous.length,next.length);
+  for(let n=max;n>=2;n--) {
+    if(previous.endsWith(next.slice(0,n))) return previous+next.slice(n);
+  }
+  // If the model reproduced the complete file with added lines, use the longer one.
+  if(previous.length>80 && next.startsWith(previous.slice(0,Math.min(200,previous.length))) && next.length>previous.length)
+    return next;
+  return previous+next;
+}
+function projectTokenCount(state) {
+  return (state.files||[]).reduce((sum,file)=>sum+estimateOutputTokens(file.content),0);
+}
+function projectLineCount(state) {
+  return (state.files||[]).reduce((sum,file)=>sum+(file.content?file.content.split(/\r?\n/).length:0),0);
+}
+function projectContext(messages) {
+  const sys=messages.find(m=>m.role==="system");
+  return [...(sys?[sys]:[]),...messages.filter(m=>m.role!=="system").slice(-9)];
+}
+function fileInstruction(state,file) {
+  const names=state.files.map(f=>`${f.name}${f.purpose?" ("+f.purpose+")":""}`).join("; ");
+  const requirements=`Ты создаёшь НАСТОЯЩИЙ файл для скачивания в проекте Venus AI.
+  Запрошен файл: ${file.name}. Его назначение: ${file.purpose||"Реализуй требование пользователя"}.
+  Файлы проекта: ${names}.
+  Выдай ТОЛЬКО исходный код текущего файла, без Markdown, тройных кавычек, пояснений и заглушек.
+  Все импорты, функции, обработчики и зависимости должны быть согласованы с перечисленными файлами.
+  Используй рабочие алгоритмы, а не фиктивные интерфейсы. Не заявляй о запуске тестов.
+  Когда файл ПОЛНОСТЬЮ закончен, добавь отдельной строкой точный маркер ${PROJECT_END}.
+  Если не помещается, остановись на границе строки без маркера: продолжение будет запрошено.`;
+  if(!file.content)return requirements;
+  return `Продолжи ТОЛЬКО файл ${file.name} точно после уже написанного кода.
+  Не повторяй предыдущие строки, не открывай новый Markdown-блок, не начинай файл заново.
+  Последние строки готового кода (это КОНТЕКСТ, не повторяй их):
+  ${file.content.slice(-7000)}
+  ---
+  Выдай только следующую часть исходного кода. Как только файл полностью закончен, добавь отдельной строкой ${PROJECT_END}.`;
+}
+async function requestFilePart(state,file,messages,headers,signal,notify) {
+  const prompt=fileInstruction(state,file);
+  const context=[...projectContext(messages),{role:"user",content:prompt}];
+  const attempts=[4096,2048,1024];
+  let lastError=null;
+  for(let attempt=0;attempt<attempts.length;attempt++) {
+    if(signal.aborted)throw new DOMException("Отменено","AbortError");
+    const remaining=Math.max(256,MAX_TOTAL_CODE_TOKENS-projectTokenCount(state));
+    const size=Math.min(attempts[attempt],remaining);
+    let response;
+    try {
+      response=await fetch(API_URL,{
+        method:"POST",headers,signal,
+        body:JSON.stringify({model:state.model,messages:context,stream:attempt===0,max_tokens:size})
+      });
+      if(!response.ok) {
+        const raw=await response.text().catch(()=>"");
+        let reason=raw;
+        try {const data=JSON.parse(raw);reason=data.error?.message||data.error||raw;}catch{}
+        const e=new Error(`API ${response.status}: ${String(reason).slice(0,300)}`);
+        e.status=response.status;
+        throw e;
+      }
+      let text="",metadata;
+      beginLiveTokenPreview();
+      try {
+        metadata=await readVenusResponse(response,fragment=>{
+          text+=fragment;
+          updateLiveTokenPreview(text);
+          notify?.(text);
+        });
+      } catch(e) {
+        if(!text)throw e;
+        metadata={finishReason:"interrupted",interrupted:true,usage:null};
+      } finally {
+        endLiveTokenPreview();
+      }
+      // One API request produces exactly one usage accounting record.
+      addTokenUsage(metadata.usage,context,text);
+      if(text.trim())return {text,reason:metadata.finishReason,interrupted:metadata.interrupted};
+      lastError=new Error("Модель не прислала текст.");
+    } catch(e) {
+      endLiveTokenPreview();
+      if(signal.aborted || [400,401,403,413].includes(e.status))throw e;
+      lastError=e;
+    }
+    notify?.("",`Повторная попытка ${attempt+2} из ${attempts.length} — меньшая часть`);
+  }
+  throw lastError||new Error("Модель не вернула код.");
+}
+async function ensureProjectManifest(state,messages,headers,signal,progress) {
+  if(state.files?.length)return;
+  const prompt=`Определи минимальный, но ПОЛНЫЙ список файлов для задачи пользователя. Ответ строго JSON:
+  {"files":[{"path":"index.html","purpose":"конкретное назначение"}]}.
+  Максимум ${MAX_PROJECT_FILES} файлов. Не добавляй лишних файлов, не пиши код.`;
+  let raw="";
+  try {
+    const response=await requestVenusOnce(
+      [...projectContext(messages),{role:"user",content:prompt}],
+      state.model,headers,signal,750
+    );
+    raw=response.text;
+  }catch(e){
+    if(signal.aborted || [401,403].includes(e.status))throw e;
+    console.warn("Venus AI: project plan skipped",e);
+  }
+  state.files=normalizeProjectManifest(raw,state.task);
+  progress(1,`Определены файлы проекта: ${state.files.map(f=>f.name).join(", ")}`);
+}
+async function buildRealProject(chat,message,headers,signal,progress) {
+  const state=message.projectState;
+  const initial=chat.messages.slice(0,chat.messages.indexOf(message));
+  // Construct model input from the original conversation, not from partial artifacts.
+  const base=await buildApiMessages({messages:initial});
+  await ensureProjectManifest(state,base,headers,signal,progress);
+  message.truncated=true;
+  let attempts=0;
+  for(let index=0;index<state.files.length;index++) {
+    const file=state.files[index];
+    if(file.complete)continue;
+    let stalled=0;
+    for(let round=0;round<MAX_FILE_ROUNDS && attempts<MAX_PROJECT_REQUESTS;round++) {
+      if(signal.aborted)throw new DOMException("Отменено","AbortError");
+      if(projectTokenCount(state)>=MAX_TOTAL_CODE_TOKENS-100) {
+        message.tokenBudgetHit=true;break;
+      }
+      progress(1,`Создаю ${file.name} (${index+1}/${state.files.length}) · ${projectLineCount(state)} строк · ≈${projectTokenCount(state)} токенов`);
+      const before=file.content;
+      let fragment;
+      try {
+        fragment=await requestFilePart(state,file,base,headers,signal,
+          (text,detail)=>{
+            if(detail)progress(1,detail);
+            else if(text)progress(1,`${file.name} · пишу код · ≈${projectTokenCount(state)+estimateOutputTokens(text)} токенов`);
+          }
+        );
+      } catch(e) {
+        if(signal.aborted || [401,403].includes(e.status))throw e;
+        state.lastError=e.message||"Ошибка запроса";
+        break;
+      }
+      attempts++;
+      state.requests=(state.requests||0)+1;
+      const parsed=parseFileFragment(fragment.text);
+      file.content=mergeFileFragment(before,parsed.text);
+      file.rounds=(file.rounds||0)+1;
+      if(projectTokenCount(state)>MAX_TOTAL_CODE_TOKENS) {
+        file.content=before;
+        message.tokenBudgetHit=true;
+        break;
+      }
+      file.complete=parsed.complete;
+      if(file.complete) {
+        const problem=validateProjectFile(file);
+        if(problem) {
+          if((file.restarts||0)<2) {
+            file.restarts=(file.restarts||0)+1;
+            file.content="";
+            file.complete=false;
+            state.lastError=`${file.name}: исправляю ${problem}`;
+            progress(2,state.lastError);
+          } else {
+            file.complete=false;
+            state.lastError=`${file.name}: ${problem}`;
+          }
+        }
+      }
+      message.content=buildProjectMarkdown(state);
+      message.truncated=state.files.some(f=>!f.complete);
+      saveChats(); // Save actual returned source after every successful request.
+      renderLineUsage();
+      if(file.complete)break;
+      stalled=file.content.length===before.length?stalled+1:0;
+      if(stalled>=2) {
+        state.lastError=`${file.name}: модель повторяет одинаковый фрагмент`;
+        break;
+      }
+    }
+    if(!file.complete)break;
+  }
+  message.content=buildProjectMarkdown(state);
+  const finished=state.files.length>0 && state.files.every(f=>f.complete);
+  message.truncated=!finished;
+  message.resuming=false;
+  state.finished=finished;
+  saveChats();
+  return finished;
+}
+
+/* SEND */
+async function send(text,attachmentsOverride=null) {
+  text=String(text||"").trim();
+  const selected=attachmentsOverride===null?pendingAttachments.slice():attachmentsOverride.slice();
+  if((!text&&!selected.length)||busy)return;
+  if(!auth.currentUser) {
+    openAuth("login");
+    authError("Войдите в аккаунт Venus AI, чтобы отправлять сообщения.");
+    return;
+  }
+  if(!text)text="Изучи прикреплённые файлы и помоги с ними.";
+  let c=active();
+  if(!c) {
+    c={id:Date.now(),title:(text||selected[0]?.name||"Новый чат").slice(0,40),messages:[]};
+    currentChats.unshift(c);cur=c.id;
+  }
+  const codeBuild=shouldCreateFiles(text,c);
+  c.messages.push({role:"user",content:text,attachments:selected.map(a=>({
+    mediaId:a.mediaId,name:a.name,type:a.type,kind:a.kind,remoteUrl:a.remoteUrl||""
+  }))});
+  if(attachmentsOverride===null) {pendingAttachments=[];renderPendingAttachments();}
+  $("inp").value="";grow();saveChats();renderList();renderMsgs();
+  const am={role:"assistant",content:"",codeBuild,truncated:codeBuild,resuming:codeBuild};
+  const liveHtml=codeBuild?codeBuildHtml(0,"Подготавливаю исходные файлы…"):'<div class="dots"><i></i><i></i><i></i></div>';
+  $("wrap").insertAdjacentHTML("beforeend",`<div class="row" id="live"><div class="av"></div><div class="bub">${liveHtml}</div></div>`);
+  const live=()=>$("live")?.lastElementChild;
+  const progress=(stage,detail="")=>{
+    const el=live();if(el)el.innerHTML=codeBuildHtml(stage,detail);
+    $("msgs").scrollTop=$("msgs").scrollHeight;
+  };
+  busy=true;ctrl=new AbortController();upd();
+  try {
+    const headers={"Content-Type":"application/json", "Authorization":`Bearer ${await auth.currentUser.getIdToken()}`};
+    const model=$("modelSelect").value;
+    if(codeBuild) {
+      am.projectState={task:text,model,files:[],requests:0,finished:false,lastError:""};
+      c.messages.push(am);saveChats();
+      await buildRealProject(c,am,headers,ctrl.signal,progress);
+      if(!am.content.trim())throw new Error("Модель не создала ни одного файла. Попробуй режим High или Pro High.");
+    } else {
+      const messages=await buildApiMessages(c);
+      const response=await fetch(API_URL,{
+        method:"POST",headers,signal:ctrl.signal,
+        body:JSON.stringify({model,messages,stream:true,max_tokens:4096})
+      });
+      if(!response.ok) {
+        const raw=await response.text();let detail=raw;
+        try {const obj=JSON.parse(raw);detail=obj.error?.message||obj.error||raw;}catch{}
+        throw new Error(`Ошибка ${response.status}: ${String(detail).slice(0,400)}`);
+      }
+      let output="";
+      const result=await readVenusResponse(response,piece=>{
+        output+=piece;
+        const el=live();if(el)el.innerHTML=md(output);
+        $("msgs").scrollTop=$("msgs").scrollHeight;
+      });
+      addTokenUsage(result.usage,messages,output);
+      if(!output.trim()) {
+        const fallback=await requestVenusOnce(messages,model,headers,ctrl.signal,2048);
+        output=fallback.text;
+      }
+      if(!output.trim())throw new Error("Модель вернула пустой ответ. Попробуй другую модель.");
+      am.content=output;
+      am.truncated=result.finishReason==="length" || !!result.interrupted;
+      c.messages.push(am);
+    }
+  } catch(e) {
+    if(e.name!=="AbortError") {
+      const hint=e.message==="Failed to fetch"?"Не удалось подключиться к API.":String(e.message||e);
+      if(codeBuild) {
+        am.truncated=true;
+        am.resumeError=hint;
+        if(am.projectState)am.projectState.lastError=hint;
+      }
+      if(live())live().innerHTML=`<div class="err">${esc(hint)}${codeBuild?" · Можно продолжить с сохранённого места.":""}</div>`;
+    }
+    if(!c.messages.includes(am) && am.content)c.messages.push(am);
+  } finally {
+    am.resuming=false;
+    busy=false;ctrl=null;
+    endLiveTokenPreview();
+    saveChats();upd();renderMsgs();
+  }
+}
+
+async function resumeIncompleteCode(index) {
+  const chat=active(),message=chat?.messages?.[index];
+  if(!message?.projectState) return resumeLegacyIncompleteCode(index);
+  if(busy || !message.truncated)return;
+  if(!auth.currentUser) {openAuth("login");return;}
+  busy=true;ctrl=new AbortController();message.resuming=true;message.resumeError="";upd();renderMsgs();
+  try {
+    const headers={"Content-Type":"application/json","Authorization":`Bearer ${await auth.currentUser.getIdToken()}`};
+    const show=(stage,detail)=>{
+      const node=$("wrap").querySelectorAll(".row")[index]?.querySelector(".bub");
+      if(node)node.innerHTML=codeBuildHtml(stage,detail);
+    };
+    await buildRealProject(chat,message,headers,ctrl.signal,show);
+  } catch(e) {
+    message.truncated=true;
+    if(e.name!=="AbortError")message.resumeError=String(e.message||e);
+  } finally {
+    message.resuming=false;busy=false;ctrl=null;
+    endLiveTokenPreview();saveChats();upd();renderMsgs();
+  }
+}
+
+/* Old responses retain their previous continuation workflow. */
+async function resumeLegacyIncompleteCode(index) {
+  const chat=active(),message=chat?.messages?.[index];
+  if(!message || !message.truncated || busy)return;
+  const lastUser=chat.messages.slice(0,index).reverse().find(m=>m.role==="user");
+  if(!lastUser)return;
+  // Legacy artifacts did not save per-file state, so regenerate on a fresh turn.
+  send(lastUser.content+"\n\nЗакончи полный исходный код. Не используй заглушки.");
+}
+
+/* SEND BUTTON */
+
+function upd() {
+
+  const s=$("send");
+
+  if(busy) {
+
+    s.disabled=false;
+
+    s.innerHTML=`
+      <svg width="14" height="14" viewBox="0 0 24 24"
+        fill="currentColor">
+        <rect x="5" y="5" width="14" height="14" rx="2"/>
+      </svg>
+    `;
+
+  } else {
+
+    s.innerHTML=`
+      <svg width="18" height="18" viewBox="0 0 24 24"
+        fill="none" stroke="currentColor" stroke-width="2.4"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 19V5M5 12l7-7 7 7"/>
+      </svg>
+    `;
+
+    s.disabled=!$("inp").value.trim() && pendingAttachments.length===0;
+
+  }
+
+}
+
+function grow() {
+
+  const t=$("inp");
+
+  t.style.height="auto";
+  t.style.height=Math.min(t.scrollHeight,200)+"px";
+
+}
+
+
+/* PRO SUBSCRIPTIONS AND ADMIN PANEL */
+
+$("upgradeBtn").onclick = () => {
+  $("proMod").classList.add("on");
+  closeSide();
+};
+
+$("closeProBtn").onclick = () => $("proMod").classList.remove("on");
+$("proMod").addEventListener("click", e => {
+  if (e.target === $("proMod")) $("proMod").classList.remove("on");
+});
+
+$("buyProBtn").onclick = () => {
+  window.open("https://t.me/omge5", "_blank", "noopener,noreferrer");
+};
+
+async function renderAdminGrantList() {
+  const list = $("grantList");
+  list.innerHTML = "";
+  const loading = document.createElement("div");
+  loading.className = "grant-empty";
+  loading.textContent = "Загрузка списка...";
+  list.appendChild(loading);
+
+  const [usersSnapshot, grantsSnapshot] = await Promise.all([
+    get(ref(database, "venusPro/userIndex")),
+    get(ref(database, "venusPro/grants"))
+  ]);
+  const users = usersSnapshot.exists() ? usersSnapshot.val() : {};
+  const grants = grantsSnapshot.exists() ? grantsSnapshot.val() : {};
+  list.innerHTML = "";
+  const entries = Object.entries(grants).sort((a,b) => Number(b[1]?.grantedAt || 0) - Number(a[1]?.grantedAt || 0));
+  if (!entries.length) {
+    const empty = document.createElement("div");
+    empty.className = "grant-empty";
+    empty.textContent = "Пока нет выданных подписок.";
+    list.appendChild(empty);
+    return;
+  }
+  for (const [uid, grant] of entries) {
+    const email = normalizeEmail(grant?.email || users[uid]?.email || "Аккаунт без email");
+    const row = document.createElement("div");
+    row.className = "grant-row";
+    const meta = document.createElement("div");
+    meta.className = "grant-meta";
+    const emailNode = document.createElement("div");
+    emailNode.className = "grant-email";
+    emailNode.textContent = email;
+    const expiry = document.createElement("div");
+    expiry.className = "grant-expiry";
+    const expiresAt = Number(grant?.expiresAt || 0);
+    expiry.textContent = expiresAt > Date.now()
+      ? "До " + new Date(expiresAt).toLocaleString("ru-RU")
+      : "Подписка истекла";
+    const removeButton = document.createElement("button");
+    removeButton.className = "grant-remove";
+    removeButton.type = "button";
+    removeButton.textContent = "Отозвать";
+    removeButton.dataset.removeGrant = uid;
+    removeButton.dataset.grantEmail = email;
+    meta.append(emailNode, expiry);
+    row.append(meta, removeButton);
+    list.appendChild(row);
+  }
+}
+
+$("adminBtn").onclick = async () => {
+  if (normalizeEmail(currentUser?.email) !== ADMIN_EMAIL) return;
+  $("adminFeedback").textContent = "";
+  $("adminMod").classList.add("on");
+  closeSide();
+  try {
+    await renderAdminGrantList();
+  } catch (error) {
+    $("adminFeedback").textContent = "Не удалось загрузить список. Проверьте правила Firebase Database.";
+  }
+};
+
+$("closeAdminBtn").onclick = () => $("adminMod").classList.remove("on");
+$("adminMod").addEventListener("click", e => {
+  if (e.target === $("adminMod")) $("adminMod").classList.remove("on");
+});
+
+$("grantProBtn").onclick = async () => {
+  if (normalizeEmail(currentUser?.email) !== ADMIN_EMAIL) {
+    $("adminFeedback").textContent = "Нет прав администратора.";
+    return;
+  }
+  const email = normalizeEmail($("grantEmail").value);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    $("adminFeedback").textContent = "Введите корректный email.";
+    return;
+  }
+  const button = $("grantProBtn");
+  button.disabled = true;
+  try {
+    const usersSnapshot = await get(ref(database, "venusPro/userIndex"));
+    const users = usersSnapshot.exists() ? usersSnapshot.val() : {};
+    const found = Object.entries(users).find(([, profile]) => normalizeEmail(profile?.email) === email);
+    if (!found) {
+      throw new Error("Этот аккаунт ещё не входил на сайт. Попросите пользователя один раз авторизоваться, затем выдайте Pro.");
+    }
+    const uid = found[0];
+    const now = Date.now();
+    const grant = { email, grantedAt: now, expiresAt: now + PRO_DURATION_MS, grantedBy: ADMIN_EMAIL };
+    await set(ref(database, `venusPro/grants/${uid}`), grant);
+    const cached = getProGrants();
+    cached[email] = grant;
+    saveProGrants(cached);
+    $("grantEmail").value = "";
+    $("adminFeedback").textContent = `Pro выдан для ${email} на 30 дней.`;
+    await renderAdminGrantList();
+    if (normalizeEmail(currentUser?.email) === email) refreshProUI();
+  } catch (error) {
+    $("adminFeedback").textContent = error.message || "Не удалось выдать Pro. Проверьте правила Firebase.";
+  } finally {
+    button.disabled = false;
+  }
+};
+
+$("grantList").addEventListener("click", async e => {
+  const button = e.target.closest("[data-remove-grant]");
+  if (!button || normalizeEmail(currentUser?.email) !== ADMIN_EMAIL) return;
+  button.disabled = true;
+  const uid = button.dataset.removeGrant;
+  const email = button.dataset.grantEmail;
+  try {
+    await remove(ref(database, `venusPro/grants/${uid}`));
+    const cached = getProGrants();
+    delete cached[email];
+    saveProGrants(cached);
+    $("adminFeedback").textContent = `Подписка ${email} отозвана.`;
+    await renderAdminGrantList();
+    if (normalizeEmail(currentUser?.email) === email) refreshProUI();
+  } catch (error) {
+    $("adminFeedback").textContent = "Не удалось отозвать Pro. Проверьте правила Firebase.";
+    button.disabled = false;
+  }
+});
+
+setInterval(() => {
+  const hadPro = !$("proStatus").hidden;
+  const hasPro = refreshProCountdown();
+  if (hadPro !== hasPro) refreshProUI();
+}, 1000);
+
+/* SETTINGS */
+
+function openSet() {
+
+  $("kSys").value=systemPrompt;
+  $("mod").classList.add("on");
+
+}
+
+$("setBtn").onclick=()=>{
+  openSet();
+  closeSide();
+};
+
+$("cancel").onclick=()=>{
+  $("mod").classList.remove("on");
+};
+
+$("save").onclick=()=>{
+
+  systemPrompt=$("kSys").value.trim()||DEFAULT_SYS;
+
+  saveSystem();
+
+  $("mod").classList.remove("on");
+
+};
+
+
+
+/* THEME + LAYOUT CONTROLS */
+const VENUS_THEME_KEY = "venus_theme_v2";
+function applyVenusTheme(theme) {
+  const nextTheme = theme === "dark" ? "dark" : "light";
+  document.documentElement.dataset.theme = nextTheme;
+  try { localStorage.setItem(VENUS_THEME_KEY, nextTheme); } catch (e) {}
+  const btn = $("themeToggle");
+  btn.setAttribute("aria-label", nextTheme === "dark" ? "Включить светлую тему" : "Включить тёмную тему");
+  btn.innerHTML = nextTheme === "dark"
+    ? `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"/></svg>`
+    : `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.985 12.486A9 9 0 0 1 11.514 3.01 9 9 0 1 0 20.985 12.486Z"/></svg>`;
+}
+applyVenusTheme(document.documentElement.dataset.theme);
+$("themeToggle").onclick = () => applyVenusTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+$("sidebarToggle").onclick = () => {
+  const collapsed = $("app").classList.toggle("sidebar-collapsed");
+  $("sidebarToggle").setAttribute("aria-label", collapsed ? "Показать боковую панель" : "Скрыть боковую панель");
+};
+$("topNewBtn").onclick = () => $("newBtn").click();
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    closeSide();
+    for (const id of ["mod", "proMod", "adminMod"]) $(id).classList.remove("on");
+  }
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "o") {
+    e.preventDefault();
+    $("newBtn").click();
+  }
+});
+
+/* EVENTS */
+
+$("attachBtn").onclick=()=>$("fileInput").click();
+$("fileInput").addEventListener("change",e=>addFiles(e.target.files));
+
+$("attachmentTray").addEventListener("click",e=>{
+  const button=e.target.closest("[data-remove-attachment]");
+  if(!button)return;
+  const index=Number(button.dataset.removeAttachment);
+  const removed=pendingAttachments.splice(index,1)[0];
+  if(removed) {
+    // Deleting from the temporary tray does not affect files already sent in chat.
+  }
+  renderPendingAttachments();
+  upd();
+});
+
+$("inp").addEventListener("input",()=>{
+  grow();
+  upd();
+});
+
+$("inp").addEventListener("keydown",e=>{
+  if(e.key==="Enter"&&!e.shiftKey&&!/Mobi|Android/i.test(navigator.userAgent)) {
+    e.preventDefault();
+    send($("inp").value);
+  }
+});
+
+$("send").onclick=()=>{
+  if(busy&&ctrl)ctrl.abort();
+  else send($("inp").value);
+};
+
+$("newBtn").onclick=()=>{
+  cur=null;
+  pendingAttachments=[];
+  renderPendingAttachments();
+  renderList();
+  renderMsgs();
+  closeSide();
+  $("inp").focus();
+  upd();
+};
+
+$("burger").onclick=()=>{
+  $("side").classList.add("on");
+  $("back").classList.add("on");
+};
+
+$("back").onclick=closeSide;
+
+/* ARTIFACT VIEWER */
+/* Download one generated file, or all files as a .zip project. */
+function makeCodeZip(files) {
+  const encoder=new TextEncoder();
+  const chunks=[];
+  const directory=[];
+  let offset=0;
+  const table=new Uint32Array(256);
+  for(let n=0;n<256;n++){
+    let crc=n;
+    for(let bit=0;bit<8;bit++) crc=(crc&1)?(0xedb88320^(crc>>>1)):(crc>>>1);
+    table[n]=crc>>>0;
+  }
+  const checksum=bytes=>{
+    let crc=0xffffffff;
+    for(const byte of bytes)crc=table[(crc^byte)&255]^(crc>>>8);
+    return (crc^0xffffffff)>>>0;
+  };
+  const header=(len,write)=>{
+    const data=new Uint8Array(len);
+    write(new DataView(data.buffer));
+    return data;
+  };
+  files.forEach((file,index)=>{
+    const filename=safeCodeFilename(file.name)||`file-${index+1}.txt`;
+    const name=encoder.encode(filename);
+    const data=encoder.encode(file.text);
+    const crc=checksum(data);
+    const local=header(30,(v)=>{
+      v.setUint32(0,0x04034b50,true);v.setUint16(4,20,true);
+      v.setUint16(6,0x0800,true);v.setUint16(8,0,true);
+      v.setUint32(14,crc,true);v.setUint32(18,data.length,true);
+      v.setUint32(22,data.length,true);v.setUint16(26,name.length,true);
+    });
+    chunks.push(local,name,data);
+    const central=header(46,(v)=>{
+      v.setUint32(0,0x02014b50,true);v.setUint16(4,20,true);v.setUint16(6,20,true);
+      v.setUint16(8,0x0800,true);v.setUint16(10,0,true);
+      v.setUint32(16,crc,true);v.setUint32(20,data.length,true);
+      v.setUint32(24,data.length,true);v.setUint16(28,name.length,true);
+      v.setUint32(42,offset,true);
+    });
+    directory.push(central,name);
+    offset+=local.length+name.length+data.length;
+  });
+  const dirSize=directory.reduce((n,item)=>n+item.length,0);
+  const footer=header(22,(v)=>{
+    v.setUint32(0,0x06054b50,true);
+    v.setUint16(8,files.length,true);v.setUint16(10,files.length,true);
+    v.setUint32(12,dirSize,true);v.setUint32(16,offset,true);
+  });
+  return new Blob([...chunks,...directory,footer],{type:"application/zip"});
+}
+
+function saveGeneratedFiles(files) {
+  if(!files.length)return;
+  if(files.length===1) {
+    const filename=files[0].name.split("/").pop();
+    downloadBlob(files[0].text,filename,"text/plain;charset=utf-8");
+    return;
+  }
+  const blob=makeCodeZip(files);
+  const url=URL.createObjectURL(blob);
+  const link=document.createElement("a");
+  link.href=url;link.download="venus-ai-project.zip";
+  document.body.appendChild(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
+
+let openedArtifact=null;
+let artifactReturnFocus=null;
+
+function openArtifact(card) {
+  const raw=card.querySelector(".artifact-source code");
+  if(!raw) return;
+  const code=raw.textContent||"";
+  const language=card.dataset.artifactLang||"text";
+  const filename=card.dataset.artifactFilename||`venus-code.${extensionForLanguage(language)}`;
+  const complete=card.dataset.artifactComplete!=="false";
+  openedArtifact={code,language,filename,complete};
+  $("artifactWarning").hidden=complete;
+  $("artifactDownload").disabled=!complete;
+  $("artifactDownload").title=complete?"Скачать готовый файл":"Файл не завершён";
+  artifactReturnFocus=document.activeElement;
+  $("artifactCode").textContent=code;
+  $("artifactTitle").textContent=filename;
+  $("artifactFilename").textContent=filename;
+  $("artifactLanguage").textContent=language.toUpperCase();
+  const lines=code ? code.split("\n").length : 0;
+  $("artifactStats").textContent=`${lines} строк · ${formatBytes(new Blob([code]).size)}${complete?"":" · НЕ ЗАВЕРШЁН"}`;
+  $("artifactCopyLabel").textContent="Копировать";
+  $("artifactModal").classList.add("on");
+  $("artifactModal").setAttribute("aria-hidden","false");
+  $("artifactClose").focus();
+}
+
+function closeArtifact() {
+  $("artifactModal").classList.remove("on");
+  $("artifactModal").setAttribute("aria-hidden","true");
+  openedArtifact=null;
+  artifactReturnFocus?.focus?.();
+  artifactReturnFocus=null;
+}
+
+$("artifactClose").onclick=closeArtifact;
+$("artifactModal").addEventListener("click",e=>{
+  if(e.target===$("artifactModal")) closeArtifact();
+});
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape" && $("artifactModal").classList.contains("on")) {
+    e.preventDefault();
+    closeArtifact();
+  }
+});
+
+$("artifactCopy").onclick=async()=>{
+  if(!openedArtifact) return;
+  try {
+    await navigator.clipboard.writeText(openedArtifact.code);
+    $("artifactCopyLabel").textContent="Скопировано";
+    setTimeout(()=>{if($("artifactCopyLabel")) $("artifactCopyLabel").textContent="Копировать";},1500);
+  } catch(error) {
+    // Clipboard can be unavailable in insecure origins: show selected text.
+    const selection=window.getSelection();
+    const range=document.createRange();
+    range.selectNodeContents($("artifactCode"));
+    selection.removeAllRanges();
+    selection.addRange(range);
+    alert("Выделил код — скопируйте его вручную.");
+  }
+};
+
+$("artifactDownload").onclick=()=>{
+  if(!openedArtifact || !openedArtifact.complete) return;
+  downloadBlob(openedArtifact.code,openedArtifact.filename,"text/plain;charset=utf-8");
+};
+
+/* MESSAGE ACTIONS, CODE EXPORTS AND SUGGESTIONS */
+
+$("wrap").addEventListener("click",async e=>{
+  const suggestion=e.target.closest("[data-s]");
+  if(suggestion) {
+    send(suggestion.dataset.s);
+    return;
+  }
+
+  const artifactButton=e.target.closest("[data-open-artifact]");
+  if(artifactButton) {
+    openArtifact(artifactButton.closest(".artifact-card"));
+    return;
+  }
+
+  const copyCode=e.target.closest("[data-copy]");
+  if(copyCode) {
+    const code=copyCode.closest(".pre").querySelector("code").textContent;
+    try {
+      await navigator.clipboard.writeText(code);
+      copyCode.textContent="Скопировано";
+      setTimeout(()=>copyCode.textContent="Копировать",1400);
+    } catch(err) { alert("Не удалось скопировать код."); }
+    return;
+  }
+
+  const downloadCode=e.target.closest("[data-download-code]");
+  if(downloadCode) {
+    const code=downloadCode.closest(".pre").querySelector("code").textContent;
+    const lang=(downloadCode.dataset.lang||"txt").toLowerCase();
+    const ext=extensionForLanguage(lang);
+    downloadBlob(code,`venus-ai-code.${ext}`,"text/plain;charset=utf-8");
+    return;
+  }
+
+  const index=Number(e.target.closest("[data-index]")?.dataset.index);
+  const c=active();
+  if(!c || !Number.isInteger(index))return;
+  const message=c.messages[index];
+  if(!message || message.role!=="assistant")return;
+
+  if(e.target.closest("[data-resume-code]")) {
+    await resumeIncompleteCode(index);
+    return;
+  }
+
+  if(e.target.closest("[data-download-project]")) {
+    if(message.truncated) { alert("Этот код ещё не завершён. Скачивание полного проекта недоступно.");return; }
+    const parsed=inspectCodeFiles(message.content);
+    if(parsed.issues.length) { alert("В файлах найдена проблема: "+parsed.issues.join("; "));return; }
+    saveGeneratedFiles(parsed.files);
+    return;
+  }
+
+  if(e.target.closest("[data-copy-answer]")) {
+    try {
+      await navigator.clipboard.writeText(message.content||"");
+      e.target.closest("[data-copy-answer]").textContent="Скопировано";
+    } catch(err) { alert("Не удалось скопировать ответ."); }
+    return;
+  }
+
+  if(e.target.closest("[data-share-answer]")) {
+    const payload={title:"Ответ Venus AI",text:message.content||""};
+    try {
+      if(navigator.share) await navigator.share(payload);
+      else {
+        await navigator.clipboard.writeText(payload.text);
+        alert("Ответ скопирован — его можно отправить.");
+      }
+    } catch(err) {
+      if(err.name!=="AbortError") alert("Не удалось поделиться ответом.");
+    }
+    return;
+  }
+
+  if(e.target.closest("[data-download-answer]")) {
+    downloadBlob(message.content||"",`venus-ai-answer-${index+1}.md`,"text/markdown;charset=utf-8");
+    return;
+  }
+
+  if(e.target.closest("[data-retry]")) {
+    retryMessage(index);
+  }
+});
+</script>
+</body>
+</html>
