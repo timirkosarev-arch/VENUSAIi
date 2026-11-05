@@ -5,7 +5,7 @@
       "maxDuration": 300
     },
     "api/upload.js": {
-      "maxDuration": 30
+      "maxDuration": 240
     }
   }
 }
