@@ -14,8 +14,8 @@ const MODELS = {
 const ADMIN_EMAIL = "flexadssq@gmail.com";
 const PRO_MS = 30 * 24 * 60 * 60 * 1000;
 
-const TOTAL_TIMEOUT_MS = 150000;
-const MAX_TOKENS_PER_CALL = 3072;
+const TOTAL_TIMEOUT_MS = 40000;
+const MAX_TOKENS_PER_CALL = 1536;
 const MAX_MESSAGES = 40;
 const MAX_CONTENT_CHARS = 250000;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -378,9 +378,7 @@ function readText(data) {
   const message = data?.choices?.[0]?.message;
   const value = message?.content;
 
-  if (typeof value === "string") {
-    return value;
-  }
+  if (typeof value === "string") return value;
 
   if (Array.isArray(value)) {
     return value.map(
@@ -399,7 +397,7 @@ function describeError(error, signal) {
     return {
       status: 503,
       message:
-        "Ответ слишком долгий. Venus AI может повторить запрос меньшей частью."
+        "AnyModel отвечает слишком долго. Повторите генерацию меньшей частью; предыдущий код сохранится."
     };
   }
 
@@ -414,7 +412,7 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     return res.status(200).json({
       ok: true,
-      version: "venus-timeout-fix-2"
+      version: "venus-lines-timeout-fix-3"
     });
   }
 
@@ -465,7 +463,8 @@ export default async function handler(req, res) {
       "cx/gpt-6.1-sol": MODELS.high
     };
 
-    const model = aliases[body.model] || body.model;
+    const model =
+      aliases[body.model] || body.model;
 
     if (!Object.values(MODELS).includes(model)) {
       throw fail(
@@ -504,9 +503,7 @@ export default async function handler(req, res) {
 
     const messages = [];
 
-    for (
-      const msg of body.messages.slice(-MAX_MESSAGES)
-    ) {
+    for (const msg of body.messages.slice(-MAX_MESSAGES)) {
       if (
         !["system", "user", "assistant"].includes(
           msg?.role
@@ -532,9 +529,7 @@ export default async function handler(req, res) {
       }
     }
 
-    if (
-      !messages.some(m => m.role === "user")
-    ) {
+    if (!messages.some(m => m.role === "user")) {
       throw fail(
         400,
         "Нет сообщения пользователя."
@@ -612,7 +607,6 @@ export default async function handler(req, res) {
         )
       ).slice(0, 600);
 
-      // Некоторые провайдеры не поддерживают stream_options.
       if (
         stream &&
         [400, 422].includes(response.status) &&
@@ -673,7 +667,6 @@ export default async function handler(req, res) {
       response.body
     ) {
       stage = "streaming";
-
       res.statusCode = 200;
 
       res.setHeader(
@@ -776,6 +769,7 @@ export default async function handler(req, res) {
     );
 
     return res.status(200).json(data);
+
   } catch (error) {
     const info = describeError(
       error,
@@ -797,6 +791,7 @@ export default async function handler(req, res) {
       error: info.message,
       stage
     });
+
   } finally {
     clearTimeout(timer);
   }
