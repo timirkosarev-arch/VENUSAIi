@@ -333,6 +333,11 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .message-actions [data-download-project]{color:var(--accent);font-weight:710;border:1px solid color-mix(in srgb,var(--accent) 30%,var(--line));padding:6px 10px;background:color-mix(in srgb,var(--accent) 7%,var(--bg))}
 @media(max-width:600px){.attach-caption{display:none}.composer-left{gap:7px}.code-mode{font-size:11px;padding:6px 9px}.code-mode .ui-icon{width:14px;height:14px}}
 
+/* Token usage meter */
+.token-meter {display:flex;align-items:center;gap:6px;padding:6px 11px;border:1px solid var(--line);border-radius:999px;font-size:12px;white-space:nowrap;color:var(--muted);background:var(--panel)}
+.token-meter .ui-icon{width:15px;height:15px;stroke:var(--accent)}
+@media(max-width:720px){.token-meter{padding:6px 8px;font-size:11px}.token-meter .ui-icon{display:none}}
+@media(max-width:385px){.token-meter{max-width:88px;overflow:hidden;text-overflow:ellipsis}.token-meter #tokenCount{overflow:hidden;text-overflow:ellipsis}}
 </style>
 </head>
 
@@ -437,6 +442,10 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
   <button class="burger" id="burger" type="button" aria-label="Открыть меню"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
   <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Скрыть боковую панель" title="Боковая панель"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18"/></svg></button>
   <div class="title" id="ttl">Venus AI</div>
+  <div id="tokenMeter" class="token-meter" title="Расход токенов вашего аккаунта в этом браузере. Если API не вернул usage, показывается оценка.">
+    <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 10-12h-7l0-8Z"/></svg>
+    <span id="tokenCount">0 токенов</span>
+  </div>
   <select class="model-select" id="modelSelect" title="Модель Venus AI" aria-label="Выбрать модель">
     <option value="cx/gpt-6-luna">Flash</option>
     <option value="cx/gpt-6-sol">High</option>
@@ -1059,6 +1068,7 @@ onAuthStateChanged(auth,user => {
     : "Гость";
   $("accountEmail").textContent = user ? (user.email || "") : "Без регистрации";
   refreshProUI();
+  renderTokenUsage();
   if (user) void syncProForUser(user);
   $("logoutBtn").hidden = !user;
   $("registerBtn").hidden = !!user;
@@ -1736,9 +1746,49 @@ function retryMessage(index) {
  * 30,000 is also passed to the backend as max_tokens per request. */
 const MAX_TOKENS_PER_REQUEST = 30000;
 const MAX_TOTAL_CODE_TOKENS = 30000;
-const MAX_CODE_CONTINUATIONS = 16;
-const STANDARD_CODE_REQUEST_TOKENS = 3072;
-const BACKUP_CODE_REQUEST_TOKENS = 1536;
+const MAX_CODE_CONTINUATIONS = 40;
+const STANDARD_CODE_REQUEST_TOKENS = 2048;
+const BACKUP_CODE_REQUEST_TOKENS = 1024;
+
+// Token totals are stored per signed-in account on this browser only.
+// Actual counts come from provider usage; estimates are marked with ≈.
+function tokenStatsKey() { return "venus_token_stats_v2_" + (currentUser?.uid || "guest"); }
+function tokenStats() {
+  const stats=store.get(tokenStatsKey(), {prompt:0,completion:0,requests:0,estimatedRequests:0});
+  return stats && typeof stats==="object" ? stats : {prompt:0,completion:0,requests:0,estimatedRequests:0};
+}
+function renderTokenUsage() {
+  const stats=tokenStats();
+  const total=(Number(stats.prompt)||0)+(Number(stats.completion)||0);
+  const approximate=(Number(stats.estimatedRequests)||0)>0;
+  const el=$("tokenCount");
+  if(!el)return;
+  el.textContent=(approximate?"≈":"")+Math.round(total).toLocaleString("ru-RU")+" токенов";
+  $("tokenMeter").title="Токены в этом браузере: вход " + Math.round(stats.prompt||0).toLocaleString("ru-RU")+
+    ", выход " + Math.round(stats.completion||0).toLocaleString("ru-RU") +
+    ", запросов " + Math.round(stats.requests||0)+
+    (approximate?". Часть значений оценочная: провайдер не вернул usage.":". Значения получены из ответа API.");
+}
+function estimateUsageTokens(content) {
+  if(typeof content==="string")return Math.max(1,Math.ceil(new TextEncoder().encode(content).length/3.5));
+  if(Array.isArray(content))return content.reduce((n,part)=>n+estimateUsageTokens(part?.text || ""),0);
+  return 0;
+}
+function addTokenUsage(usage,messages,output) {
+  const values=usage && typeof usage==="object" ? usage : null;
+  const knownPrompt=Number(values?.prompt_tokens);
+  const knownCompletion=Number(values?.completion_tokens);
+  const hasReal=!!values && Object.hasOwn(values,"prompt_tokens") && Object.hasOwn(values,"completion_tokens") && Number.isFinite(knownPrompt) && knownPrompt>=0 && Number.isFinite(knownCompletion) && knownCompletion>=0;
+  const prompt=hasReal?knownPrompt:Math.max(1,(messages||[]).reduce((n,m)=>n+estimateUsageTokens(m?.content),0));
+  const completion=hasReal?knownCompletion:Math.max(0,estimateUsageTokens(output||""));
+  const stats=tokenStats();
+  stats.prompt=(Number(stats.prompt)||0)+prompt;
+  stats.completion=(Number(stats.completion)||0)+completion;
+  stats.requests=(Number(stats.requests)||0)+1;
+  if(!hasReal)stats.estimatedRequests=(Number(stats.estimatedRequests)||0)+1;
+  store.set(tokenStatsKey(),stats);
+  renderTokenUsage();
+}
 
 function estimateOutputTokens(text) {
   // Approximation for mixed programming text; the provider's tokenizer wins.
@@ -1802,11 +1852,11 @@ async function readVenusResponse(response,onText) {
     const choice=parsed.choices?.[0]||{};
     const text=visibleVenusText(choice,parsed);
     if(text) onText(text);
-    return {finishReason:choice.finish_reason||null,interrupted:false,empty:!text.trim()};
+    return {finishReason:choice.finish_reason||null,interrupted:false,empty:!text.trim(),usage:parsed.usage||null,alreadyCounted:parsed._venusAlreadyCounted===true};
   }
   const reader=response.body.getReader();
   const decoder=new TextDecoder();
-  let buffer="",reason=null,receivedDone=false,receivedText=false;
+  let buffer="",reason=null,receivedDone=false,receivedText=false,usage=null;
   function consumeFrame(frame) {
     const data=frame.split("\n")
       .filter(line=>line.startsWith("data:"))
@@ -1820,6 +1870,7 @@ async function readVenusResponse(response,onText) {
       throw new Error(typeof parsed.error==="string"?parsed.error:
         (parsed.error.message||"Ошибка модели"));
     }
+    if(parsed.usage && typeof parsed.usage==="object")usage=parsed.usage;
     const choice=parsed.choices?.[0]||{};
     if(choice.finish_reason) reason=choice.finish_reason;
     if(reason==="error" || reason==="content_filter")
@@ -1846,7 +1897,7 @@ async function readVenusResponse(response,onText) {
       for(const frame of buffer.split("\n\n")) consumeFrame(frame);
     }
   } finally {try{reader.releaseLock();}catch{}}
-  return {finishReason:reason,interrupted:receivedText&&!receivedDone&&!reason,empty:!receivedText};
+  return {finishReason:reason,interrupted:receivedText&&!receivedDone&&!reason,empty:!receivedText,usage};
 }
 
 function mergeCodeContinuation(previous,continued) {
@@ -1918,7 +1969,8 @@ async function requestVenusOnce(messages,model,headers,signal,maxTokens=1024) {
   }
   let output="";
   const result=await readVenusResponse(response,p=>{output+=p;});
-  return {text:output,reason:result.finishReason,empty:!output.trim()};
+  addTokenUsage(result.usage,messages,output);
+  return {text:output,reason:result.finishReason,empty:!output.trim(),usage:result.usage};
 }
 
 async function requestVisibleCode(messages,model,headers,signal,tokenBudget,update) {
@@ -2100,7 +2152,8 @@ async function send(text,attachmentsOverride=null) {
           );
           if(!fallback.text.trim()) throw new Error("Модель пока не ответила. Полученный код сохранён.");
           r=new Response(JSON.stringify({
-            choices:[{message:{content:fallback.text},finish_reason:fallback.reason||"stop"}]
+            choices:[{message:{content:fallback.text},finish_reason:fallback.reason||"stop"}],
+            _venusAlreadyCounted:true
           }),{status:200,headers:{"Content-Type":"application/json"}});
         } else {
           ctrl.signal.removeEventListener("abort",abortAttempt);
@@ -2153,6 +2206,7 @@ async function send(text,attachmentsOverride=null) {
       } finally {
         ctrl.signal.removeEventListener("abort",abortAttempt);
       }
+      if(!result.alreadyCounted)addTokenUsage(result.usage,conversation,currentPart);
       if(budgetHit) {outputReason="budget";interrupted=true;paint();break;}
       // Some reasoning models return only an empty SSE event. Retry in JSON mode
       // before showing a misleading "model returned no answer" message.
