@@ -3,315 +3,273 @@ import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getDatabase } from "firebase-admin/database";
 
-const API_URL = "https://anymodel.org/v1/chat/completions";
+const ANYMODEL_URL = "https://anymodel.org/v1/chat/completions";
 
-const FREE_MODELS = new Set([
-  "cx/gpt-6-luna",
-  "cx/gpt-6.1-sol"
-]);
+const MODELS = Object.freeze({
+  flash: "cx/gpt-6-luna",
+  high: "cx/gpt-6-sol",
+  astro: "cx/gpt-6-astra"
+});
 
-const PRO_MODEL = "cx/gpt-6-astra";
 const ADMIN_EMAIL = "flexadssq@gmail.com";
-const PRO_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
+const PRO_MS = 30 * 24 * 60 * 60 * 1000;
 
+const MAX_TOKENS = 30000;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const MAX_MESSAGES = 40;
 const MAX_CONTENT_CHARS = 250000;
-const MAX_OUTPUT_TOKENS = 30000;
+const MAX_MESSAGES = 40;
 
-const ALLOWED_IMAGE_TYPES = new Set([
+const IMAGE_TYPES = new Set([
   "image/jpeg",
   "image/png",
   "image/webp",
   "image/gif"
 ]);
 
-function jsonError(res, status, message) {
-  return res.status(status).json({ error: message });
-}
+const normalEmail = value =>
+  String(value || "").trim().toLowerCase();
 
-function normalizeEmail(value) {
-  return String(value || "").trim().toLowerCase();
-}
+const httpError = (status, message) =>
+  Object.assign(new Error(message), { status });
 
-function getFirebaseAdminApp() {
+const sendError = (res, status, message) =>
+  res.status(status).json({ error: message });
+
+function adminApp() {
   const existing = getApps().find(
     app => app.name === "venus-ai-api"
   );
 
   if (existing) return existing;
 
-  let serviceAccount;
+  let account;
 
-  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-    try {
-      serviceAccount = JSON.parse(
-        process.env.FIREBASE_SERVICE_ACCOUNT_JSON
-      );
-    } catch (error) {
-      throw new Error(
-        "FIREBASE_SERVICE_ACCOUNT_JSON содержит некорректный JSON."
-      );
-    }
-  } else {
-    const projectId = process.env.FIREBASE_PROJECT_ID;
-    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY;
-
-    if (!projectId || !clientEmail || !privateKey) {
-      throw new Error(
-        "Настройте FIREBASE_SERVICE_ACCOUNT_JSON либо FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL и FIREBASE_PRIVATE_KEY."
-      );
-    }
-
-    serviceAccount = {
-      project_id: projectId,
-      client_email: clientEmail,
-      private_key: privateKey.replace(/\\n/g, "\n")
-    };
-  }
-
-  if (typeof serviceAccount.private_key === "string") {
-    serviceAccount.private_key =
-      serviceAccount.private_key.replace(/\\n/g, "\n");
-  }
-
-  const databaseURL = process.env.FIREBASE_DATABASE_URL;
-
-  if (!databaseURL) {
-    throw new Error(
-      "Не задан FIREBASE_DATABASE_URL для Firebase Realtime Database."
+  try {
+    account = process.env.FIREBASE_SERVICE_ACCOUNT_JSON
+      ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON)
+      : {
+          project_id: process.env.FIREBASE_PROJECT_ID,
+          client_email: process.env.FIREBASE_CLIENT_EMAIL,
+          private_key: process.env.FIREBASE_PRIVATE_KEY
+        };
+  } catch {
+    throw httpError(
+      500,
+      "Некорректный FIREBASE_SERVICE_ACCOUNT_JSON."
     );
   }
 
+  if (
+    !account?.project_id ||
+    !account?.client_email ||
+    !account?.private_key
+  ) {
+    throw httpError(
+      500,
+      "Не настроен Firebase Admin в Vercel."
+    );
+  }
+
+  if (!process.env.FIREBASE_DATABASE_URL) {
+    throw httpError(
+      500,
+      "Не настроен FIREBASE_DATABASE_URL."
+    );
+  }
+
+  account.private_key =
+    account.private_key.replace(/\\n/g, "\n");
+
   return initializeApp({
-    credential: cert(serviceAccount),
-    databaseURL
+    credential: cert(account),
+    databaseURL: process.env.FIREBASE_DATABASE_URL
   }, "venus-ai-api");
 }
 
-function getBearerToken(req) {
-  const header =
-    req.headers.authorization ||
-    req.headers.Authorization ||
-    "";
+async function getUser(req) {
+  const auth = String(req.headers.authorization || "");
 
-  const match = String(header).match(/^Bearer\s+(.+)$/i);
-
-  return match ? match[1].trim() : "";
-}
-
-async function requireActivePro(req) {
-  const token = getBearerToken(req);
+  const token = auth.match(/^Bearer\s+(.+)$/i)?.[1];
 
   if (!token) {
-    const error = new Error(
-      "Для GPT-6 ASTRO войдите в аккаунт с активной подпиской Pro."
+    throw httpError(
+      401,
+      "Войдите в аккаунт Venus AI."
     );
-    error.statusCode = 401;
-    throw error;
   }
-
-  const app = getFirebaseAdminApp();
-
-  let decoded;
 
   try {
-    decoded = await getAuth(app).verifyIdToken(token, true);
-  } catch (error) {
-    const authError = new Error(
-      "Не удалось подтвердить вход. Войдите в аккаунт заново."
+    return await getAuth(adminApp()).verifyIdToken(
+      token,
+      true
     );
-    authError.statusCode = 401;
-    throw authError;
-  }
-
-  const email = normalizeEmail(decoded.email);
-
-  if (!decoded.uid || !email) {
-    const error = new Error(
-      "В токене Firebase отсутствует email аккаунта."
+  } catch {
+    throw httpError(
+      401,
+      "Сессия истекла. Войдите в аккаунт заново."
     );
-    error.statusCode = 403;
-    throw error;
   }
+}
 
-  const snapshot = await getDatabase(app)
-    .ref(`venusPro/grants/${decoded.uid}`)
+async function checkPro(user) {
+  const grantSnapshot = await getDatabase(adminApp())
+    .ref(`venusPro/grants/${user.uid}`)
     .get();
 
-  const grant = snapshot.exists()
-    ? snapshot.val()
-    : null;
-
-  const grantedAt = Number(grant?.grantedAt);
-  const expiresAt = Number(grant?.expiresAt);
+  const g = grantSnapshot.val();
   const now = Date.now();
 
-  const validGrant =
-    grant &&
-    normalizeEmail(grant.email) === email &&
-    normalizeEmail(grant.grantedBy) === ADMIN_EMAIL &&
-    Number.isFinite(grantedAt) &&
-    Number.isFinite(expiresAt) &&
-    grantedAt <= now + 5 * 60 * 1000 &&
-    expiresAt > now &&
-    expiresAt > grantedAt &&
-    expiresAt - grantedAt <= PRO_DURATION_MS + 5 * 60 * 1000;
+  const start = Number(g?.grantedAt);
+  const end = Number(g?.expiresAt);
 
-  if (!validGrant) {
-    const error = new Error(
-      "У этого аккаунта нет активной подписки Pro."
+  const valid =
+    g &&
+    normalEmail(g.email) === normalEmail(user.email) &&
+    normalEmail(g.grantedBy) === ADMIN_EMAIL &&
+    Number.isFinite(start) &&
+    Number.isFinite(end) &&
+    start <= now + 300000 &&
+    end > now &&
+    end > start &&
+    end - start <= PRO_MS + 300000;
+
+  if (!valid) {
+    throw httpError(
+      403,
+      "Для GPT-6 ASTRO нужна активная подписка Pro."
     );
-    error.statusCode = 403;
-    throw error;
   }
-
-  return decoded;
 }
 
-function isImgBBHost(hostname) {
-  const host = String(hostname || "").toLowerCase();
-
+function imgBBHost(host) {
   return (
     host === "i.ibb.co" ||
-    host === "i.ibb.co.com" ||
-    host.endsWith(".ibb.co")
+    host === "i.ibb.co.com"
   );
 }
 
-async function fetchImgBBAsDataUrl(sourceUrl) {
-  let parsed;
+async function imgBBToDataUrl(imageUrl) {
+  let url;
 
   try {
-    parsed = new URL(sourceUrl);
-  } catch (_) {
-    throw new Error("Некорректная ссылка на изображение.");
-  }
-
-  if (
-    parsed.protocol !== "https:" ||
-    !isImgBBHost(parsed.hostname)
-  ) {
-    throw new Error(
-      "Для фото разрешены только прямые ссылки ImgBB."
+    url = new URL(imageUrl);
+  } catch {
+    throw httpError(
+      400,
+      "Некорректная ссылка на фотографию."
     );
   }
 
-  const response = await fetch(parsed.toString(), {
-    method: "GET",
-    headers: {
-      Accept: "image/jpeg,image/png,image/webp,image/gif"
-    },
-    redirect: "follow"
-  });
+  for (let redirects = 0; redirects <= 4; redirects++) {
+    if (
+      url.protocol !== "https:" ||
+      !imgBBHost(url.hostname)
+    ) {
+      throw httpError(
+        400,
+        "Разрешены только прямые HTTPS-ссылки ImgBB."
+      );
+    }
 
-  if (!response.ok) {
-    throw new Error(
-      `ImgBB не отдал изображение (HTTP ${response.status}).`
-    );
-  }
+    const response = await fetch(url.href, {
+      headers: {
+        Accept: "image/jpeg,image/png,image/webp,image/gif"
+      },
+      redirect: "manual"
+    });
 
-  const finalUrl = new URL(
-    response.url || parsed.toString()
-  );
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      const location = response.headers.get("location");
 
-  if (
-    finalUrl.protocol !== "https:" ||
-    !isImgBBHost(finalUrl.hostname)
-  ) {
-    throw new Error(
-      "ImgBB перенаправил запрос на неизвестный адрес."
-    );
-  }
-
-  const contentType = (
-    response.headers.get("content-type") || ""
-  ).split(";")[0].trim().toLowerCase();
-
-  if (!ALLOWED_IMAGE_TYPES.has(contentType)) {
-    throw new Error(
-      `ImgBB вернул неподдерживаемый тип файла: ${contentType || "неизвестно"}.`
-    );
-  }
-
-  const declaredLength = Number(
-    response.headers.get("content-length") || 0
-  );
-
-  if (declaredLength > MAX_IMAGE_BYTES) {
-    throw new Error(
-      "Изображение слишком большое (лимит 5 МБ)."
-    );
-  }
-
-  if (!response.body) {
-    throw new Error(
-      "Не удалось получить содержимое изображения."
-    );
-  }
-
-  const reader = response.body.getReader();
-  const chunks = [];
-  let total = 0;
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-
-      if (done) break;
-
-      total += value.byteLength;
-
-      if (total > MAX_IMAGE_BYTES) {
-        await reader.cancel();
-
-        throw new Error(
-          "Изображение слишком большое (лимит 5 МБ)."
+      if (!location) {
+        throw httpError(
+          400,
+          "ImgBB вернул пустое перенаправление."
         );
       }
 
-      chunks.push(Buffer.from(value));
+      url = new URL(location, url);
+      continue;
     }
-  } finally {
-    reader.releaseLock();
-  }
 
-  if (!total) {
-    throw new Error(
-      "ImgBB вернул пустое изображение."
+    if (!response.ok) {
+      throw httpError(
+        502,
+        `ImgBB: HTTP ${response.status}.`
+      );
+    }
+
+    const type = (
+      response.headers.get("content-type") || ""
+    ).split(";")[0].toLowerCase();
+
+    if (!IMAGE_TYPES.has(type)) {
+      throw httpError(
+        400,
+        "Неподдерживаемый формат изображения."
+      );
+    }
+
+    if (
+      Number(response.headers.get("content-length") || 0) >
+      MAX_IMAGE_BYTES
+    ) {
+      throw httpError(
+        413,
+        "Размер изображения превышает 5 МБ."
+      );
+    }
+
+    if (!response.body) {
+      throw httpError(
+        502,
+        "ImgBB вернул пустой файл."
+      );
+    }
+
+    const reader = response.body.getReader();
+    const buffers = [];
+    let size = 0;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) break;
+
+        size += value.length;
+
+        if (size > MAX_IMAGE_BYTES) {
+          await reader.cancel();
+
+          throw httpError(
+            413,
+            "Размер изображения превышает 5 МБ."
+          );
+        }
+
+        buffers.push(Buffer.from(value));
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    if (!size) {
+      throw httpError(
+        502,
+        "Пустой файл изображения."
+      );
+    }
+
+    return (
+      `data:${type};base64,` +
+      Buffer.concat(buffers).toString("base64")
     );
   }
 
-  return (
-    `data:${contentType};base64,` +
-    Buffer.concat(chunks).toString("base64")
-  );
-}
-
-function validateDataImage(dataUrl) {
-  const match = String(dataUrl).match(
-    /^data:(image\/(?:png|jpe?g|webp|gif));base64,([a-z0-9+/=]+)$/i
-  );
-
-  if (!match) return false;
-
-  const mime = match[1].toLowerCase() === "image/jpg"
-    ? "image/jpeg"
-    : match[1].toLowerCase();
-
-  if (!ALLOWED_IMAGE_TYPES.has(mime)) {
-    return false;
-  }
-
-  const estimatedBytes = Buffer.from(
-    match[2],
-    "base64"
-  ).byteLength;
-
-  return (
-    estimatedBytes > 0 &&
-    estimatedBytes <= MAX_IMAGE_BYTES
+  throw httpError(
+    400,
+    "Слишком много перенаправлений ImgBB."
   );
 }
 
@@ -320,346 +278,322 @@ async function normalizeContent(content) {
     return content.slice(0, MAX_CONTENT_CHARS);
   }
 
-  if (!Array.isArray(content)) return null;
+  if (!Array.isArray(content)) {
+    return null;
+  }
 
-  const parts = [];
+  const result = [];
 
-  for (const part of content) {
-    if (!part || typeof part !== "object") continue;
-
+  for (const item of content) {
     if (
-      part.type === "text" &&
-      typeof part.text === "string"
+      item?.type === "text" &&
+      typeof item.text === "string"
     ) {
-      parts.push({
+      result.push({
         type: "text",
-        text: part.text.slice(0, MAX_CONTENT_CHARS)
+        text: item.text.slice(0, MAX_CONTENT_CHARS)
       });
-
-      continue;
-    }
-
-    if (
-      part.type === "image_url" &&
-      typeof part.image_url?.url === "string"
+    } else if (
+      item?.type === "image_url" &&
+      typeof item.image_url?.url === "string"
     ) {
-      const url = part.image_url.url;
-      let visionUrl = null;
+      let url = item.image_url.url;
 
       if (url.startsWith("data:")) {
-        if (validateDataImage(url)) {
-          visionUrl = url;
+        const match = url.match(
+          /^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/
+        );
+
+        if (
+          !match ||
+          Buffer.from(match[2], "base64").length >
+            MAX_IMAGE_BYTES
+        ) {
+          throw httpError(
+            400,
+            "Неверное изображение или размер больше 5 МБ."
+          );
         }
-      } else if (/^https:\/\//i.test(url)) {
-        visionUrl = await fetchImgBBAsDataUrl(url);
+      } else {
+        url = await imgBBToDataUrl(url);
       }
 
-      if (visionUrl) {
-        parts.push({
-          type: "image_url",
-          image_url: {
-            url: visionUrl,
-            detail: ["low", "high"].includes(
-              part.image_url.detail
-            )
-              ? part.image_url.detail
-              : "auto"
-          }
-        });
-      }
+      result.push({
+        type: "image_url",
+        image_url: {
+          url,
+          detail: "auto"
+        }
+      });
     }
   }
 
-  return parts.length ? parts : null;
+  return result.length ? result : null;
+}
+
+function isTokenLimitError(status, message) {
+  return (
+    [400, 422].includes(status) &&
+    /(?:max[_ -]?(?:completion[_ -]?)?tokens?|output.{0,20}tokens?|context.{0,20}length)/i.test(message)
+  );
 }
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
 
-    return jsonError(
+    return sendError(
       res,
       405,
-      "Method not allowed"
-    );
-  }
-
-  const apiKey = process.env.API_KEY;
-
-  if (!apiKey) {
-    return jsonError(
-      res,
-      500,
-      "API_KEY не настроен в Vercel Environment Variables"
+      "Метод не поддерживается."
     );
   }
 
   try {
-    const body = typeof req.body === "string"
-      ? JSON.parse(req.body)
-      : req.body;
+    if (!process.env.API_KEY) {
+      throw httpError(
+        500,
+        "API_KEY не настроен в Vercel."
+      );
+    }
+
+    const user = await getUser(req);
+
+    const body =
+      typeof req.body === "string"
+        ? JSON.parse(req.body)
+        : req.body;
 
     if (
       !body ||
       typeof body !== "object" ||
       Array.isArray(body)
     ) {
-      return jsonError(
-        res,
+      throw httpError(
         400,
-        "Некорректное тело запроса."
+        "Некорректный запрос."
       );
     }
 
-    const model = typeof body.model === "string"
-      ? body.model
-      : "";
+    const model = MODELS[body.model] || body.model;
 
-    if (
-      !FREE_MODELS.has(model) &&
-      model !== PRO_MODEL
-    ) {
-      return jsonError(
-        res,
+    if (!Object.values(MODELS).includes(model)) {
+      throw httpError(
         400,
-        "Неизвестная модель. Выбери Flash, High или Pro High."
+        "Неизвестная модель Venus AI."
       );
     }
 
-    if (model === PRO_MODEL) {
-      try {
-        await requireActivePro(req);
-      } catch (error) {
-        console.warn(
-          "Pro access denied:",
-          error.message
-        );
-
-        return jsonError(
-          res,
-          error.statusCode || 503,
-          error.message ||
-            "Не удалось проверить подписку Pro."
-        );
-      }
+    if (model === MODELS.astro) {
+      await checkPro(user);
     }
 
     if (
       !Array.isArray(body.messages) ||
       body.messages.length === 0
     ) {
-      return jsonError(
-        res,
+      throw httpError(
         400,
-        "Нет сообщений для отправки"
+        "Нет сообщений для модели."
       );
     }
 
     const messages = [];
 
-    const validMessages = body.messages
-      .filter(
-        message =>
-          message &&
-          ["system", "user", "assistant"].includes(
-            message.role
-          )
-      )
-      .slice(-MAX_MESSAGES);
+    for (const msg of body.messages.slice(-MAX_MESSAGES)) {
+      if (
+        !["system", "user", "assistant"].includes(msg?.role)
+      ) {
+        continue;
+      }
 
-    for (const message of validMessages) {
-      const content = await normalizeContent(
-        message.content
-      );
+      const content = await normalizeContent(msg.content);
 
-      if (content !== null && content !== "") {
+      if (
+        content &&
+        (!Array.isArray(content) || content.length)
+      ) {
         messages.push({
-          role: message.role,
+          role: msg.role,
           content
         });
       }
     }
 
-    if (
-      !messages.length ||
-      !messages.some(
-        message => message.role === "user"
-      )
-    ) {
-      return jsonError(
-        res,
+    if (!messages.some(m => m.role === "user")) {
+      throw httpError(
         400,
-        "Нет корректных сообщений пользователя"
+        "Нет сообщения пользователя."
       );
     }
 
-    // Лимит до 30 000 выходных токенов на запрос.
-    // Реальное ограничение зависит от модели.
-
-    const requestedTokens = Number(body.max_tokens);
+    const requestTokens = Number(body.max_tokens);
 
     const maxTokens =
-      Number.isFinite(requestedTokens) &&
-      requestedTokens > 0
+      Number.isFinite(requestTokens) &&
+      requestTokens >= 1
         ? Math.min(
-            MAX_OUTPUT_TOKENS,
-            Math.floor(requestedTokens)
+            MAX_TOKENS,
+            Math.floor(requestTokens)
           )
-        : MAX_OUTPUT_TOKENS;
+        : 8192;
 
-    const requestBody = {
+    const stream = body.stream === true;
+
+    const payload = {
       model,
       messages,
-      stream: body.stream !== false,
+      stream,
       max_tokens: maxTokens
     };
 
-    const upstreamHeaders = {
-      Authorization: `Bearer ${apiKey}`,
+    const headers = {
+      Authorization: `Bearer ${process.env.API_KEY}`,
       "Content-Type": "application/json",
-      Accept: requestBody.stream
+      Accept: stream
         ? "text/event-stream"
         : "application/json"
     };
 
-    let upstream = await fetch(API_URL, {
-      method: "POST",
-      headers: upstreamHeaders,
-      body: JSON.stringify(requestBody)
-    });
+    let upstream;
 
-    // Если модель не поддерживает 30K,
-    // пробуем 8192, затем 4096 токенов.
+    const limits = [
+      ...new Set(
+        [maxTokens, 8192, 4096, 2048].filter(
+          n => n <= maxTokens
+        )
+      )
+    ];
 
-    for (const smallerLimit of [8192, 4096]) {
-      if (
-        upstream.ok ||
-        requestBody.max_tokens <= smallerLimit
-      ) {
-        break;
-      }
+    let lastError = "";
 
-      if (
-        ![400, 422].includes(upstream.status)
-      ) {
-        break;
-      }
+    for (const limit of limits) {
+      payload.max_tokens = limit;
 
-      const detail = await upstream.text();
+      upstream = await fetch(ANYMODEL_URL, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload)
+      });
 
-      if (
-        !/(?:max[_ -]?(?:completion[_ -]?)?tokens?|output.{0,20}tokens?|tokens?.{0,20}limit|context.{0,20}length)/i.test(detail)
-      ) {
-        return jsonError(
-          res,
+      if (!upstream.ok) {
+        const raw = await upstream.text();
+        let reason = raw;
+
+        try {
+          const data = JSON.parse(raw);
+
+          reason =
+            data.error?.message ||
+            data.error ||
+            data.message ||
+            raw;
+        } catch {}
+
+        lastError = String(reason).slice(0, 450);
+
+        if (
+          isTokenLimitError(upstream.status, lastError)
+        ) {
+          continue;
+        }
+
+        throw httpError(
           502,
-          `AnyModel API ${upstream.status}: ${detail.slice(0, 700)}`
+          `AnyModel ${upstream.status}: ${lastError}`
         );
       }
 
-      requestBody.max_tokens = smallerLimit;
+      if (stream) break;
 
-      upstream = await fetch(API_URL, {
-        method: "POST",
-        headers: upstreamHeaders,
-        body: JSON.stringify(requestBody)
-      });
-    }
-
-    if (!upstream.ok) {
-      const rawError = await upstream.text();
-      let detail = rawError;
+      const raw = await upstream.text();
+      let parsed;
 
       try {
-        const parsed = JSON.parse(rawError);
+        parsed = JSON.parse(raw);
+      } catch {
+        throw httpError(
+          502,
+          "AnyModel вернул некорректный JSON."
+        );
+      }
 
-        detail =
-          parsed.error?.message ||
-          parsed.message ||
-          rawError;
-      } catch (_) {}
+      if (parsed?.error) {
+        const detail =
+          typeof parsed.error === "string"
+            ? parsed.error
+            : parsed.error.message;
 
-      console.error(
-        "AnyModel API error:",
-        upstream.status,
-        detail.slice(0, 1000)
-      );
+        throw httpError(
+          502,
+          String(detail || "Ошибка AnyModel.").slice(0, 450)
+        );
+      }
 
-      return jsonError(
-        res,
-        502,
-        `AnyModel API ${upstream.status}: ${detail.slice(0, 700)}`
-      );
-    }
-
-    const contentType =
-      upstream.headers.get("content-type") || "";
-
-    if (
-      contentType.includes("text/event-stream") &&
-      upstream.body
-    ) {
-      res.statusCode = 200;
+      res.setHeader("Cache-Control", "no-store");
 
       res.setHeader(
         "Content-Type",
-        "text/event-stream; charset=utf-8"
+        "application/json; charset=utf-8"
       );
 
-      res.setHeader(
-        "Cache-Control",
-        "no-cache, no-transform"
-      );
-
-      res.setHeader(
-        "Connection",
-        "keep-alive"
-      );
-
-      res.setHeader(
-        "X-Accel-Buffering",
-        "no"
-      );
-
-      for await (const chunk of upstream.body) {
-        if (res.destroyed) break;
-        res.write(chunk);
-      }
-
-      return res.end();
+      return res.status(200).send(raw);
     }
 
-    const result = await upstream.text();
+    if (!upstream?.ok || !stream) {
+      throw httpError(
+        502,
+        lastError || "Модель не вернула текст."
+      );
+    }
 
     res.statusCode = 200;
 
     res.setHeader(
       "Content-Type",
-      contentType ||
-        "application/json; charset=utf-8"
+      upstream.headers.get("content-type") ||
+        "text/event-stream; charset=utf-8"
     );
 
     res.setHeader(
       "Cache-Control",
-      "no-store"
+      "no-cache, no-transform"
     );
 
-    return res.end(result);
+    res.setHeader(
+      "X-Accel-Buffering",
+      "no"
+    );
+
+    if (!upstream.body) {
+      throw httpError(
+        502,
+        "Сервер не предоставил поток ответа."
+      );
+    }
+
+    for await (const chunk of upstream.body) {
+      if (res.destroyed) break;
+      res.write(chunk);
+    }
+
+    return res.end();
 
   } catch (error) {
     console.error(
-      "Venus AI API error:",
-      error
+      "Venus AI API:",
+      error.status || 500,
+      error.message || "unknown"
     );
 
     if (res.headersSent) {
       return res.end();
     }
 
-    return jsonError(
+    return sendError(
       res,
-      500,
-      error?.message || "Внутренняя ошибка API"
+      error.status || 500,
+      error.message || "Ошибка сервера Venus AI."
     );
   }
 }
