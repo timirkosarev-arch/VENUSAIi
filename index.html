@@ -1398,7 +1398,7 @@ function msgHTML(m,index) {
       <div class="av"></div>
       <div class="bub">
         ${md(m.content || "",!!m.truncated)}
-        ${m.truncated ? '<div class="response-incomplete">Ответ мог быть обрезан из-за лимита модели или проверка файла обнаружила проблему. Проверьте артефакт; можно попросить ИИ продолжить код.</div>' : ''}
+        ${m.truncated ? `<div class="response-incomplete">${m.tokenBudgetHit ? "Достигнут общий предел ≈30 000 токенов кода. Незавершённый файл не помечен готовым. Уменьшите проект или разбейте его на файлы в отдельных запросах." : "Ответ мог быть обрезан из-за ограничения модели или обнаружены проблемы в файле. Неполный артефакт нельзя считать готовым."}</div>` : ''}
         ${m.codeBuild && !m.truncated && inspectCodeFiles(m.content).files.length ? '<div class="code-build-result">Файл готов к скачиванию. Откройте артефакт или сохраните файлы напрямую.</div>' : ''}
         <div class="message-actions">
           ${m.codeBuild && !m.truncated && inspectCodeFiles(m.content).files.length ? `<button data-download-project data-index="${index}" type="button">${inspectCodeFiles(m.content).files.length===1?"Скачать файл":"Скачать проект ZIP"}</button>` : ''}
@@ -1718,6 +1718,38 @@ function retryMessage(index) {
   send(previous.content||"",previous.attachments||[]);
 }
 
+/* Output budgets. Token counts here are approximate: exact tokenization
+ * depends on AnyModel's underlying model, which is not exposed to the page.
+ * 30,000 is also passed to the backend as max_tokens per request. */
+const MAX_TOKENS_PER_REQUEST = 30000;
+const MAX_TOTAL_CODE_TOKENS = 30000;
+const MAX_CODE_CONTINUATIONS = 30;
+
+function estimateOutputTokens(text) {
+  // Approximation for mixed programming text; the provider's tokenizer wins.
+  return Math.ceil(new TextEncoder().encode(String(text || "")).length / 3);
+}
+
+function fitIntoCodeBudget(currentText, nextText, maxTokens=MAX_TOTAL_CODE_TOKENS) {
+  if (estimateOutputTokens(currentText + nextText) <= maxTokens) {
+    return { text:nextText, exhausted:false };
+  }
+  // Binary-search by character index; never split UTF-16 surrogate pairs.
+  let low=0, high=nextText.length;
+  while(low < high) {
+    const mid=Math.ceil((low + high)/2);
+    const trial=nextText.slice(0,mid);
+    if(estimateOutputTokens(currentText + trial) <= maxTokens) low=mid;
+    else high=mid-1;
+  }
+  let end=low;
+  if(end>0 && end<nextText.length) {
+    const last=nextText.charCodeAt(end-1);
+    if(last>=0xD800 && last<=0xDBFF) end--;
+  }
+  return {text:nextText.slice(0,end),exhausted:true};
+}
+
 /* Streaming decoder and response continuation.
  * Handles SSE chunks split across any network boundaries, including the final event
  * without a trailing blank line. Prevents silently dropping last code lines. */
@@ -1828,10 +1860,13 @@ function codeBuildHtml(stage,detail="") {
   </div>`;
 }
 
-async function requestVenusOnce(messages,model,headers,signal) {
+async function requestVenusOnce(messages,model,headers,signal,maxTokens=1024) {
   const response=await fetch(API_URL,{
     method:"POST",signal,headers,
-    body:JSON.stringify({model,messages,stream:false})
+    body:JSON.stringify({
+      model,messages,stream:false,
+      max_tokens:Math.min(MAX_TOKENS_PER_REQUEST,Math.max(1,Math.floor(maxTokens)))
+    })
   });
   if(!response.ok) {
     const raw=await response.text().catch(()=>"");
@@ -1854,7 +1889,8 @@ function finalCodeInstruction(plan) {
 2) Для каждого файла напиши строго: Файл: \`путь/имя.ext\` с новой строки, затем fenced code block с корректным языком, всем содержимым, закрывающей строкой из трёх обратных кавычек. Для одного файла выводи один артефакт.
 3) Учти импорты, зависимости, обработчики событий и адаптацию под платформу. Если пользователь дал готовый код, сохрани работающее поведение и исправь указанное.
 4) Перед завершением проверь согласованность имён функций и файлов, закрытие скобок и тегов, отсутствие пропущенных частей. Не утверждай, что запускал код, если не запускал.
-5) Минимум объяснений вне файлов. Не выводи скрытый ход рассуждений. Если ответ не помещается, продолжение будет запрошено отдельно: не обрезай решение намеренно.`.replace(/\`/g,"`");
+5) Общий объём исходного кода не должен превышать примерно 30 000 выходных токенов. Планируй размер проекта с учётом этого бюджета. Избегай дублирования.
+6) Минимум объяснений вне файлов. Не выводи скрытый ход рассуждений. Если ответ не помещается, продолжение будет запрошено отдельно: не обрезай решение намеренно.`.replace(/\`/g,"`");
 }
 
 /* SEND */
@@ -1944,21 +1980,34 @@ async function send(text,attachmentsOverride=null) {
     let outputReason=null;
     let interrupted=false;
     let continued=0;
-    // Several completions may be needed for big projects; this is a safety cap
-    // on network requests, NOT a cap on generated tokens.
-    const maxRounds=codeBuild?10:5;
+    let budgetHit=false;
+    let stalled=0;
+    // Continue automatically while a file is incomplete and the 30k budget
+    // has not been reached. Keep a finite network safety limit.
+    const maxRounds=codeBuild?MAX_CODE_CONTINUATIONS:8;
     for(let round=0;round<maxRounds;round++) {
+      const remainingTokens=codeBuild
+        ? MAX_TOTAL_CODE_TOKENS-estimateOutputTokens(am.content)
+        : MAX_TOKENS_PER_REQUEST;
+      if(codeBuild && remainingTokens<=0) {budgetHit=true;break;}
+      const responseTokenLimit=Math.min(MAX_TOKENS_PER_REQUEST,Math.max(1,remainingTokens));
+      const attemptController=new AbortController();
+      const abortAttempt=()=>attemptController.abort();
+      ctrl.signal.addEventListener("abort",abortAttempt,{once:true});
+      if(ctrl.signal.aborted) abortAttempt();
       const r=await fetch(API_URL,{
         method:"POST",
-        signal:ctrl.signal,
+        signal:attemptController.signal,
         headers:requestHeaders,
         body:JSON.stringify({
           model:selectedModel,
           messages:conversation,
-          stream:true
+          stream:true,
+          max_tokens:responseTokenLimit
         })
       });
       if(!r.ok) {
+        ctrl.signal.removeEventListener("abort",abortAttempt);
         let t="";
         try { t=await r.text(); } catch(e) {}
         throw new Error("Ошибка "+r.status+(t?": "+t.slice(0,500):""));
@@ -1967,7 +2016,7 @@ async function send(text,attachmentsOverride=null) {
       let currentPart="";
       let lastPaint=0;
       const paint=()=>{
-        if(codeBuild)progress(1,`Получено ${Math.round(am.content.length/1000*10)/10} тыс. символов${round?" · продолжаю файл":""}`);
+        if(codeBuild)progress(1,`Код: ≈${estimateOutputTokens(am.content).toLocaleString("ru-RU")} / 30 000 токенов${round?" · автоматически продолжаю":""}`);
         else {
           const el=live();
           if(el)el.innerHTML=md(am.content);
@@ -1975,20 +2024,49 @@ async function send(text,attachmentsOverride=null) {
         }
       };
       const addText=piece=>{
-        if(!piece) return;
-        currentPart+=piece;
-        am.content=round===0 ? existing+currentPart : mergeCodeContinuation(existing,currentPart);
+        if(!piece || budgetHit) return;
+        const proposedPart=currentPart+piece;
+        const proposedAll=round===0
+          ? existing+proposedPart
+          : mergeCodeContinuation(existing,proposedPart);
+        if(codeBuild) {
+          const fitted=fitIntoCodeBudget("",proposedAll,MAX_TOTAL_CODE_TOKENS);
+          if(fitted.exhausted) {
+            // Retain the exact prefix of code received, without fabricating
+            // closing braces, tags, or code fences.
+            am.content=fitted.text;
+            currentPart=proposedPart;
+            budgetHit=true;
+            attemptController.abort();
+          } else {
+            currentPart=proposedPart;
+            am.content=proposedAll;
+          }
+        } else {
+          currentPart=proposedPart;
+          am.content=proposedAll;
+        }
         // Full Markdown parsing on each token freezes mobile browsers for long files.
         if(Date.now()-lastPaint>110) { paint();lastPaint=Date.now(); }
       };
-      const result=await readVenusResponse(r,addText);
+      let result;
+      try {
+        result=await readVenusResponse(r,addText);
+      } catch(readError) {
+        if(!budgetHit || ctrl.signal.aborted) throw readError;
+        result={finishReason:"budget",interrupted:true};
+      } finally {
+        ctrl.signal.removeEventListener("abort",abortAttempt);
+      }
+      if(budgetHit) {outputReason="budget";interrupted=true;paint();break;}
       // Some reasoning models return only an empty SSE event. Retry in JSON mode
       // before showing a misleading "model returned no answer" message.
       if(!currentPart.trim()) {
         if(round===0) progress(1,"Потоковый ответ пуст. Повторяю запрос обычным способом.");
         try {
           const fallback=await requestVenusOnce(
-            conversation,selectedModel,requestHeaders,ctrl.signal
+            conversation,selectedModel,requestHeaders,ctrl.signal,
+            Math.min(MAX_TOKENS_PER_REQUEST,Math.max(1,remainingTokens))
           );
           if(fallback.trim()) addText(fallback);
         } catch(fallbackError) {
@@ -2018,6 +2096,12 @@ async function send(text,attachmentsOverride=null) {
       continued=round;
       paint();
       if(ctrl.signal.aborted) throw new DOMException("Aborted","AbortError");
+      if(codeBuild && estimateOutputTokens(am.content)>=MAX_TOTAL_CODE_TOKENS) {
+        budgetHit=true;
+        break;
+      }
+      stalled=am.content.length===existing.length ? stalled+1 : 0;
+      if(stalled>=3) {interrupted=true;break;}
       const unfinished=hasUnclosedCodeFence(am.content);
       const limitHit=outputReason==="length";
       if(!limitHit && !unfinished && !interrupted) break;
@@ -2036,7 +2120,8 @@ async function send(text,attachmentsOverride=null) {
       progress(2,"Проверяю целостность блоков кода и имена файлов.");
       const checked=inspectCodeFiles(am.content);
       am.codeBuild=true;
-      am.truncated = outputReason==="length" || interrupted || checked.issues.length>0;
+      am.tokenBudgetHit=budgetHit;
+      am.truncated = budgetHit || outputReason==="length" || interrupted || checked.issues.length>0;
       if(checked.issues.length) {
         console.warn("Venus AI: issues in generated code",checked.issues);
         // Do not expose a partially generated file as complete.
