@@ -3,662 +3,256 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#050505">
+<meta name="theme-color" content="#ffffff">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem("venus_theme_v2")||"light"}catch(e){document.documentElement.dataset.theme="light"}</script>
 <title>Venus AI</title>
 
 <link rel="icon" href="https://i.ibb.co.com/wryLQv5P/photo-2026-11-03-00-49-56.jpg">
 
 <style>
+/* Venus AI — Studio UI 2026. All existing application IDs are preserved. */
 :root {
-  --bg:#050505;
-  --side:#090909;
-  --panel:#151515;
-  --panel2:#26143d;
-  --line:#39205c;
-  --text:#f5f0ff;
-  --muted:#a995cf;
-  --accent:#a855f7;
-  --accent2:#7c3aed;
-  --user:#291344;
-  --ava:url("https://i.ibb.co.com/wryLQv5P/photo-2026-11-03-00-49-56.jpg");
-}
-
-* {box-sizing:border-box;margin:0}
-[hidden] {display:none!important}
-html,body {height:100%}
-body {
-  background:var(--bg);
-  color:var(--text);
-  font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif;
-  overflow:hidden;
-}
-button,input,textarea,select {font:inherit}
-button {color:inherit;cursor:pointer}
-.logo,.av {
-  background:var(--ava) center/cover no-repeat;
-  flex-shrink:0;
-}
-.logo {
-  width:34px;height:34px;border-radius:50%;
-  box-shadow:0 0 20px #9333ea66;
-}
-.av {width:28px;height:28px;border-radius:50%;font-size:14px}
-
-/* AUTHENTICATION */
-
-.auth-screen {
-  height:100%;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:20px;
-  overflow:auto;
-  background:
-    radial-gradient(ellipse at 50% 15%,#35125355,transparent 55%),
-    #050505;
-}
-.auth-card {
-  width:100%;
-  max-width:420px;
-  padding:28px;
-  border:1px solid var(--line);
-  border-radius:22px;
-  background:#101010;
-  box-shadow:0 15px 70px #000;
-}
-.auth-back {
-  display:block;
-  margin:0 0 14px;
-  padding:7px 10px;
-  border:1px solid var(--line);
-  border-radius:9px;
-  background:#151019;
-  color:#d8b4fe;
-  font-size:13px;
-}
-.auth-back:hover {background:#211333}
-.auth-head {text-align:center;margin-bottom:22px}
-.auth-head .logo {
-  width:76px;height:76px;
-  margin:0 auto 14px;
-}
-.auth-head h1 {font-size:27px}
-.auth-head p {color:var(--muted);font-size:14px}
-.auth-google {
-  width:100%;
-  padding:12px;
-  background:#f5f5f5;
-  color:#171717;
-  border-radius:12px;
-  font-weight:600;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  gap:12px;
-  border:0;
-}
-.google-g {
-  font-size:21px;
-  font-weight:800;
-  color:#4285f4;
-}
-.auth-divider {
-  display:flex;
-  align-items:center;
-  gap:12px;
-  margin:17px 0;
-  color:var(--muted);
-  font-size:13px;
-}
-.auth-divider:before,.auth-divider:after {
-  content:"";height:1px;background:var(--line);flex:1;
-}
-.auth-form {display:flex;flex-direction:column;gap:11px}
-.auth-form input {
-  width:100%;
-  padding:12px 14px;
-  border-radius:11px;
-  border:1px solid var(--line);
-  outline:none;
-  background:#090909;
-  color:white;
-}
-.auth-form input:focus {border-color:var(--accent)}
-.auth-primary {
-  width:100%;
-  padding:12px;
-  border:0;
-  border-radius:11px;
-  background:linear-gradient(135deg,#a855f7,#6d28d9);
-  font-weight:700;
-}
-.auth-primary:disabled {opacity:.5}
-.auth-switch {
-  width:100%;
-  margin-top:17px;
-  color:#c084fc;
-  font-size:14px;
-  background:none;
-}
-.auth-error {
-  color:#ff9db0;
-  font-size:13px;
-  padding:9px;
-  background:#35101e;
-  border-radius:9px;
-  display:none;
-}
-.auth-info {
-  font-size:11px;
-  color:var(--muted);
-  text-align:center;
-  margin-top:17px;
-}
-
-/* APPLICATION */
-
-.app {display:flex;height:100%}
-
-.side {
-  width:268px;
-  background:var(--side);
-  display:flex;
-  flex-direction:column;
-  padding:10px;
-  gap:8px;
-  flex-shrink:0;
-  transition:transform .25s;
-  padding-top:calc(10px + env(safe-area-inset-top,0px));
-  padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));
-}
-.brand {
-  display:flex;
-  align-items:center;
-  gap:10px;
-  padding:8px 10px;
-  font-weight:700;
-  font-size:18px;
-}
-.new {
-  display:flex;
-  align-items:center;
-  gap:10px;
-  padding:10px 12px;
-  border-radius:10px;
-  text-align:left;
-  background:#1c102b;
-}
-.new:hover {background:#32194e}
-.list {
-  flex:1;
-  overflow:auto;
-  display:flex;
-  flex-direction:column;
-  gap:2px;
-}
-.chat {
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  padding:9px 12px;
-  border-radius:10px;
-  font-size:14px;
-  gap:6px;
-}
-.chat:hover {background:var(--panel)}
-.chat.on {background:var(--panel2)}
-.chat span {
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-  flex:1;
-}
-.chat .x {
-  opacity:0;
-  color:var(--muted);
-  padding:0 4px;
-}
-.chat:hover .x {opacity:1}
-@media(hover:none) {.chat .x {opacity:.6}}
-
-.foot {border-top:1px solid var(--line);padding-top:10px}
-.foot-actions {
-  display:flex;
-  gap:7px;
-}
-.foot-actions .new {
-  flex:1;
-  justify-content:center;
-  font-size:13px;
-  padding:10px 5px;
-  min-width:0;
-}
-.telegram {
-  color:#d8b4fe;
-  text-decoration:none;
-}
-.register-guest {
-  width:100%;
-  justify-content:center;
-  margin:10px 0 4px;
-  border:1px solid #493064;
-  color:#e9d5ff;
-  background:#211333;
-}
-.register-guest:hover {background:#32194e;border-color:#72509a}
-.account {
-  display:flex;
-  align-items:center;
-  gap:9px;
-  padding:12px 5px 5px;
-  min-width:0;
-}
-.account-avatar {width:30px;height:30px;border-radius:50%;background:var(--ava) center/cover}
-.account-info {flex:1;min-width:0}
-.account-info div {
-  font-size:13px;
-  overflow:hidden;
-  white-space:nowrap;
-  text-overflow:ellipsis;
-}
-.account-info small {font-size:11px;color:var(--muted)}
-.logout {
-  padding:7px;
-  color:#c084fc;
-  font-size:12px;
-  border-radius:8px;
-}
-.logout:hover {background:var(--panel2)}
-
-.main {
-  flex:1;
-  display:flex;
-  flex-direction:column;
-  min-width:0;
-  height:100%;
-  background:#050505;
-}
-.top {
-  display:flex;
-  align-items:center;
-  gap:8px;
-  padding:10px 14px;
-  padding-top:calc(10px + env(safe-area-inset-top,0px));
-}
-.burger {
-  display:none;
-  padding:6px 8px;
-  border-radius:8px;
-  font-size:20px;
-  background:none;
-  border:0;
-  color:white;
-}
-.title {
-  font-weight:600;
-  color:var(--muted);
-  flex:1;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-}
-.msgs {flex:1;overflow:auto;scroll-behavior:smooth}
-.wrap {max-width:760px;margin:0 auto;padding:16px 18px 24px}
-.row {display:flex;gap:10px;margin:14px 0}
-.row.u {justify-content:flex-end}
-.bub {
-  min-width:0;
-  max-width:100%;
-  overflow-wrap:anywhere;
-  font-size:14.5px;
-  line-height:1.5;
-}
-.u .bub {
-  background:var(--user);
-  padding:7px 12px;
-  border-radius:16px;
-  max-width:78%;
-  white-space:pre-wrap;
-}
-.bub p {margin:0 0 .6em}
-.bub p:last-child {margin:0}
-.bub ul,.bub ol {margin:0 0 .8em 1.3em}
-.bub h1,.bub h2,.bub h3 {margin:.9em 0 .4em;line-height:1.3}
-.bub h1 {font-size:1.4em}
-.bub h2 {font-size:1.2em}
-.bub h3 {font-size:1.05em}
-.bub code {
-  background:var(--panel2);
-  padding:1px 6px;
-  border-radius:6px;
-  font:13.5px ui-monospace,monospace;
-}
-.bub a {color:#c084fc}
-
-.pre {
-  background:#0c0618;
-  border:1px solid var(--line);
-  border-radius:12px;
-  margin:.6em 0 .9em;
-  overflow:hidden;
-}
-.pre .h {
-  display:flex;
-  justify-content:space-between;
-  padding:6px 12px;
-  background:var(--panel);
-  font-size:12px;
-  color:var(--muted);
-}
-.pre pre {
-  padding:12px;
-  overflow:auto;
-  font:13px/1.5 ui-monospace,monospace;
-}
-.pre code {background:none;padding:0}
-.pre button {background:none;border:0;color:#c084fc;cursor:pointer}
-
-.dots {display:inline-flex;gap:4px;padding:8px 0}
-.dots i {
-  width:7px;height:7px;border-radius:50%;
-  background:var(--accent);
-  animation:b 1s infinite;
-}
-.dots i:nth-child(2) {animation-delay:.15s}
-.dots i:nth-child(3) {animation-delay:.3s}
-@keyframes b {
-  0%,60%,100% {opacity:.25}
-  30% {opacity:1;transform:translateY(-3px)}
-}
-.err {
-  color:#ff9db0;
-  background:#3a1020;
-  border:1px solid #6b2040;
-  padding:10px 14px;
-  border-radius:12px;
-}
-
-/* HERO */
-
-.hero {
-  height:100%;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  gap:14px;
-  text-align:center;
-  padding:20px;
-}
-.hero .logo {
-  width:76px;height:76px;
-  box-shadow:0 0 50px #a855f77a;
-}
-.hero h1 {font-size:28px}
-.hero p {color:var(--muted);max-width:420px}
-.sugs {
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  justify-content:center;
-  margin-top:6px;
-}
-.sugs button {
-  border:1px solid #6d28d9;
-  border-radius:14px;
-  padding:9px 14px;
-  font-size:14px;
-  color:#d8b4fe;
-  background:#101010;
-}
-.sugs button:hover {background:#32194e}
-
-/* COMPOSER */
-
-.comp {
-  padding:8px 14px calc(14px + env(safe-area-inset-bottom,0px));
-}
-.box {
-  max-width:760px;
-  margin:0 auto;
-  background:var(--panel);
-  border:1px solid #33243f;
-  border-radius:21px;
-  display:flex;
-  align-items:flex-end;
-  gap:6px;
-  padding:5px 7px 5px 14px;
-  box-shadow:none;
-}
-.box:focus-within {border-color:#72509a;box-shadow:none}
-textarea {
-  flex:1;
-  background:none;
-  border:0;
-  outline:0;
-  color:var(--text);
-  resize:none;
-  max-height:160px;
-  min-width:0;
-  min-height:28px;
-  padding:4px 0;
-  line-height:1.45;
-}
-textarea::placeholder {color:var(--muted)}
-
-.model-select {
-  width:128px;
-  max-width:34%;
-  background:#211333;
-  color:#e9d5ff;
-  border:1px solid #6d28d9;
-  border-radius:12px;
-  outline:none;
-  padding:8px 5px;
-  font-size:12px;
-  height:36px;
-  cursor:pointer;
-}
-.send {
-  width:36px;height:36px;
-  border-radius:50%;
-  background:linear-gradient(135deg,#a855f7,#6d28d9);
-  display:grid;
-  place-items:center;
-  flex-shrink:0;
-  color:white;
-  border:0;
-}
-.send:hover {background:linear-gradient(135deg,#c084fc,#9333ea)}
-.send:disabled {opacity:.35;cursor:default}
-.note {
-  text-align:center;
-  font-size:12px;
-  color:var(--muted);
-  margin-top:8px;
-}
-
-.attach {
-  width:36px;height:36px;flex-shrink:0;
-  display:grid;place-items:center;
-  border:1px solid var(--line);border-radius:50%;
-  background:#211333;color:#e9d5ff;font-size:19px;
-}
-.attach:hover {background:#39205c;border-color:var(--accent)}
-.attach:disabled {opacity:.4;cursor:wait}
-.attachment-tray {
-  max-width:760px;margin:9px auto 0;
-  display:flex;flex-wrap:wrap;gap:8px;
-}
-.attachment-item {
-  position:relative;width:92px;min-height:76px;
-  background:#17101f;border:1px solid var(--line);
-  border-radius:12px;padding:6px;overflow:hidden;
-  display:flex;flex-direction:column;gap:4px;
-}
-.attachment-item img {width:100%;height:66px;object-fit:cover;border-radius:7px}
-.attachment-item .file-icon {font-size:25px;text-align:center;line-height:40px}
-.attachment-item .file-name {
-  font-size:10px;color:var(--muted);overflow:hidden;
-  white-space:nowrap;text-overflow:ellipsis;
-}
-.attachment-item .remove-attachment {
-  position:absolute;right:4px;top:4px;width:22px;height:22px;
-  border-radius:50%;background:#090909dd;color:#fff;
-  display:grid;place-items:center;font-size:13px;
-}
-.attachment-hint {font-size:11px;color:var(--muted);width:100%}
-.user-attachments {display:flex;flex-wrap:wrap;gap:7px;margin-top:8px;max-width:330px}
-.user-attachments img {
-  width:min(180px,42vw);height:150px;object-fit:cover;
-  border-radius:11px;border:1px solid var(--line);background:#111;
-}
-.user-file {
-  display:flex;align-items:center;gap:7px;padding:7px 10px;
-  background:#17101f;border:1px solid var(--line);
-  border-radius:9px;color:#e9d5ff;font-size:12px;max-width:230px;
-}
-.user-file span {overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.message-actions {display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
-.message-actions button {
-  border:1px solid var(--line);border-radius:9px;
-  padding:6px 9px;color:#d8b4fe;background:#100b17;font-size:11px;
-}
-.message-actions button:hover {background:#2a1740;border-color:var(--accent)}
-.pre .h {align-items:center;gap:8px}
-.pre .h .code-actions {display:flex;gap:10px}
-.pre .h button {font-size:11px}
-
-/* SETTINGS */
-
-.mod {
-  position:fixed;
-  inset:0;
-  background:#000c;
-  display:none;
-  align-items:center;
-  justify-content:center;
-  padding:16px;
-  z-index:30;
-}
-.mod.on {display:flex}
-.card {
-  background:#151515;
-  border:1px solid var(--line);
-  border-radius:18px;
-  padding:20px;
-  width:100%;
-  max-width:440px;
-  display:flex;
-  flex-direction:column;
-  gap:12px;
-}
-.card h2 {font-size:18px}
-.card label {
-  font-size:13px;
-  color:var(--muted);
-  display:flex;
-  flex-direction:column;
-  gap:5px;
-}
-.card textarea {
-  background:#090909;
-  border:1px solid var(--line);
-  border-radius:10px;
-  padding:12px;
-  color:white;
-  width:100%;
-  min-height:130px;
-  max-height:250px;
-}
-.btns {display:flex;gap:8px;justify-content:flex-end}
-.btn {
-  padding:9px 16px;
-  border-radius:10px;
-  border:1px solid var(--line);
-  background:#211333;
-  color:white;
-}
-.btn.p {
-  background:linear-gradient(135deg,#a855f7,#6d28d9);
-  border:0;
-}
-.back {display:none}
-
-@media(max-width:800px) {
-  .side {
-    position:fixed;
-    inset:0 auto 0 0;
-    z-index:20;
-    transform:translateX(-100%);
-    width:280px;
-  }
-  .side.on {transform:none}
-  .back.on {
-    display:block;
-    position:fixed;
-    inset:0;
-    background:#0009;
-    z-index:15;
-  }
-  .burger {display:block}
-}
-@media(max-width:400px) {
-  .box {padding-left:12px;gap:5px}
-  .model-select {width:105px;font-size:11px}
-  .comp {padding-left:8px;padding-right:8px}
-}
-::-webkit-scrollbar {width:8px}
-::-webkit-scrollbar-thumb {background:var(--line);border-radius:8px}
-
-
-/* PRO SUBSCRIPTION */
-.pro-upgrade {
-  border:1px solid #9b5de5;
-  background:linear-gradient(110deg,#24113b,#3b1760 55%,#25103e);
-  color:#f3e8ff;font-weight:700;box-shadow:0 0 18px #9333ea2b;
-}
-.pro-upgrade:hover {border-color:#d8b4fe;box-shadow:0 0 22px #a855f755}
-.admin-open {width:100%;justify-content:center;margin-top:8px;border:1px solid #7650a0;color:#e9d5ff}
-.pro-status {
-  display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;
-  margin:0 14px 8px;padding:9px 14px;border:1px solid #9d61f5;border-radius:12px;
-  background:linear-gradient(100deg,#21102f,#35134f,#21102f);
-  box-shadow:0 0 18px #a855f766,inset 0 0 14px #a855f71c;
-  animation:proGlow 2s ease-in-out infinite alternate;color:#f5eaff;font-size:13px;
-}
-.pro-status strong {color:#fff;text-shadow:0 0 10px #d8b4fe}
-.pro-status span {color:#d8b4fe;font-variant-numeric:tabular-nums}
-@keyframes proGlow {from{box-shadow:0 0 10px #a855f744,inset 0 0 8px #a855f711}to{box-shadow:0 0 24px #a855f788,inset 0 0 16px #a855f733}}
-.pro-card {text-align:center;max-width:420px;gap:14px}
-.pro-kicker {font-size:11px;letter-spacing:3px;color:#c084fc;font-weight:800}
-.pro-card h2 {font-size:26px;letter-spacing:.5px}
-.pro-description {font-size:13px;color:var(--muted);line-height:1.5}
-.pro-price-line {display:flex;align-items:baseline;justify-content:center;gap:9px;margin:4px 0}
-.old-price {font-size:23px;color:#8b8297;text-decoration:line-through;text-decoration-thickness:2px}
-.new-price {font-size:48px;font-weight:900;line-height:1;color:#d8b4fe;text-shadow:0 0 10px #a855f7,0 0 26px #9333ea;animation:priceGlow 1.4s ease-in-out infinite alternate}
-.per-month {font-size:14px;color:var(--muted)}
-.pro-price-note {font-size:12px;color:#c4a5fd}
-@keyframes priceGlow {from{text-shadow:0 0 8px #a855f7,0 0 16px #9333ea}to{text-shadow:0 0 14px #d8b4fe,0 0 32px #9333ea}}
-.pro-buy {width:100%;padding:13px;font-size:15px;font-weight:800}
-.admin-card {max-height:min(86vh,720px);overflow:auto}
-.admin-card label {gap:7px}
-.admin-email-input {width:100%;padding:11px 12px;background:#090909;color:#fff;border:1px solid var(--line);border-radius:10px;outline:none}
-.admin-email-input:focus {border-color:var(--accent)}
-.admin-feedback {min-height:18px;font-size:12px;color:#c4a5fd}
-.grant-list-title {font-size:13px;font-weight:700;color:#e9d5ff;margin-top:4px}
-.grant-list {display:flex;flex-direction:column;gap:7px;max-height:260px;overflow:auto}
-.grant-empty {font-size:12px;color:var(--muted);padding:10px;border:1px dashed var(--line);border-radius:9px;text-align:center}
-.grant-row {display:flex;align-items:center;gap:8px;padding:9px;background:#0b0b0b;border:1px solid var(--line);border-radius:10px}
-.grant-meta {flex:1;min-width:0}
-.grant-email {font-size:12px;overflow-wrap:anywhere;color:#f3e8ff}
-.grant-expiry {font-size:10px;color:var(--muted)}
-.grant-remove {border:1px solid #65304b;background:#2a101c;color:#ffb4c4;border-radius:8px;padding:6px 9px;font-size:11px}
-@media(max-width:520px) {
-  .pro-status {margin-left:8px;margin-right:8px;font-size:12px}
-  .pro-card h2 {font-size:23px}
-  .new-price {font-size:42px}
-}
+  color-scheme:light;
+  --bg:#ffffff; --side:#f8f8f7; --panel:#ffffff; --panel2:#f4f4f3;
+  --line:#e8e8e6; --text:#232322; --muted:#797974; --accent:#6051a8;
+  --accent2:#6954b7; --user:#f3f3f1; --card:#fff; --hover:#efefed;
+  --soft:#f6f6f4; --shadow:0 12px 50px rgba(30,30,30,.055);
+  --danger:#b23b58; --overlay:rgba(20,20,20,.42);
+  --ava:url('https://i.ibb.co.com/wryLQv5P/photo-2026-11-03-00-49-56.jpg');
+}
+:root[data-theme="dark"] {
+  color-scheme:dark;
+  --bg:#181818; --side:#111111; --panel:#242424; --panel2:#2d2d2d;
+  --line:#373737; --text:#f3f3f2; --muted:#a5a5a4; --accent:#c1aaff;
+  --accent2:#ae97fc; --user:#303030; --card:#252525; --hover:#272727;
+  --soft:#202020; --shadow:0 16px 50px rgba(0,0,0,.18);
+  --danger:#ff9cb3; --overlay:rgba(0,0,0,.73);
+}
+* { box-sizing:border-box; }
+[hidden] {display:none !important}
+html,body {height:100%;margin:0}
+body {background:var(--bg);color:var(--text);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Arial,sans-serif;overflow:hidden;letter-spacing:-.008em}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer;color:inherit;touch-action:manipulation}
+button:disabled{cursor:default;opacity:.45}
+a{color:inherit}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,a:focus-visible {outline:2px solid var(--accent);outline-offset:3px}
+.logo,.av {background:linear-gradient(145deg,#26272b,#4b445b);display:grid;place-items:center;flex-shrink:0;color:#fff}
+.logo::before,.av::before{content:"✦";font-size:17px;line-height:1}
+.logo{width:33px;height:33px;border-radius:12px}
+.av{width:30px;height:30px;border-radius:11px;margin-top:2px}
+.av::before{font-size:14px}
+/* Structure */
+.app{display:flex;width:100%;height:100%;height:100dvh;overflow:hidden}
+.side{width:260px;min-width:260px;display:flex;flex-direction:column;gap:0;padding:20px 12px 13px;background:var(--side);border-right:1px solid color-mix(in srgb,var(--line) 58%,transparent);transition:transform .24s,width .24s,min-width .24s,padding .24s;z-index:22;overflow:hidden;padding-top:calc(20px + env(safe-area-inset-top,0px));padding-bottom:calc(13px + env(safe-area-inset-bottom,0px))}
+.brand{height:49px;display:flex;align-items:center;gap:11px;padding:0 11px 18px;font-weight:720;font-size:18px;letter-spacing:-.055em;white-space:nowrap}
+.brand em{font-style:normal;color:var(--muted);font-size:10px;letter-spacing:.09em;font-weight:700;margin-left:auto;border:1px solid var(--line);padding:2px 6px;border-radius:6px}
+.new{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;padding:10px 12px;border-radius:11px;text-align:left;font-size:14px;font-weight:510;min-height:41px;transition:background .15s}
+.new:hover,.chat:hover{background:var(--hover)}
+.new .ui-icon,.foot-actions .ui-icon{width:17px;height:17px;flex-shrink:0}
+#newBtn{margin:8px 0 13px;font-weight:620}
+.sidebar-subtitle{color:var(--muted);text-transform:uppercase;font-size:10px;font-weight:750;letter-spacing:.11em;padding:8px 14px 9px}
+.list{display:flex;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;flex-direction:column;gap:3px;padding:0 2px 8px}
+.chat{display:flex;align-items:center;gap:6px;padding:9px 7px 9px 12px;min-height:39px;font-size:13px;border-radius:10px;cursor:pointer;transition:background .15s}
+.chat.on{background:var(--hover)}
+.chat span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat .x{border:0;background:transparent;padding:3px 7px;color:var(--muted);border-radius:7px;opacity:0;line-height:1.1}
+.chat:hover .x,.chat.on .x{opacity:.75}
+.chat .x:hover{background:var(--panel2);color:var(--danger)}
+.foot{padding-top:12px;border-top:1px solid var(--line);flex-shrink:0}
+.foot-actions{display:flex;flex-direction:column;gap:2px}
+.foot-actions .new{font-size:13px;padding:9px 12px;min-height:37px}
+.telegram{text-decoration:none}
+.pro-upgrade{background:linear-gradient(116deg,rgba(118,85,188,.11),rgba(118,85,188,.045));border:1px solid rgba(118,85,188,.23);color:var(--text);font-weight:650;margin:4px 0 12px;border-radius:12px}
+.pro-upgrade:hover{background:rgba(118,85,188,.15)}
+.pro-upgrade .sparkle{color:var(--accent);font-size:15px}
+.admin-open{margin:8px 0 3px;border:1px solid var(--line);font-size:13px}
+.register-guest{justify-content:center;border:1px solid var(--line);margin:7px 0}
+.account{display:flex;align-items:center;gap:10px;padding:14px 7px 2px;border-top:1px solid var(--line);margin-top:10px;min-width:0}
+.account-avatar{height:34px;width:34px;border-radius:50%;flex-shrink:0;background:#dad8f4;color:#4b428c;display:grid;place-items:center;font-size:14px;font-weight:750}
+.account-avatar::before{content:"V"}
+.account-info{flex:1;min-width:0}
+.account-info div{font-size:12.5px;font-weight:630;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.account-info small{display:block;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.logout{border:0;background:transparent;padding:7px;border-radius:9px;color:var(--muted);display:grid;place-items:center;flex-shrink:0}
+.logout:hover{background:var(--hover);color:var(--text)}
+.main{height:100%;min-height:0;flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg);position:relative}
+.top{min-height:70px;display:flex;align-items:center;gap:8px;padding:12px 26px;padding-top:calc(12px + env(safe-area-inset-top,0px));flex-shrink:0}
+.burger,.sidebar-toggle,.theme-toggle,.top-new{width:38px;height:38px;border:0;background:transparent;display:grid;place-items:center;border-radius:10px;color:var(--muted);flex-shrink:0}
+.burger{display:none}.sidebar-toggle{display:grid}
+.burger:hover,.sidebar-toggle:hover,.theme-toggle:hover,.top-new:hover{background:var(--hover);color:var(--text)}
+.ui-icon{width:19px;height:19px;display:inline-block;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.title{font-size:15px;font-weight:690;letter-spacing:-.02em;flex:0 1 auto;max-width:min(32vw,350px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.model-select{border:0;background:transparent;color:var(--muted);font-size:13px;font-weight:650;padding:8px 26px 8px 10px;max-width:175px;width:auto;outline:0;border-radius:10px;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238c8b8b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 5px center;background-size:15px}
+.model-select:hover{background-color:var(--hover);color:var(--text)}
+.model-select option{background:var(--panel);color:var(--text)}
+.top-right{margin-left:auto;display:flex;align-items:center;gap:5px}
+.top-pro{font-size:11px;font-weight:730;border-radius:999px;padding:4px 9px;background:rgba(137,94,219,.11);color:var(--accent);border:1px solid rgba(137,94,219,.18)}
+.pro-status{margin:0 auto 2px;max-width:min(760px,calc(100% - 38px));width:100%;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;border:1px solid rgba(137,94,219,.15);background:rgba(137,94,219,.055);border-radius:11px;font-size:11.5px;color:var(--muted)}
+.pro-status strong{color:var(--accent);font-weight:720}
+.pro-status span{font-variant-numeric:tabular-nums}
+/* Chat */
+.msgs{flex:1;min-height:0;overflow:auto;scroll-behavior:smooth;overscroll-behavior:contain}
+.wrap{max-width:804px;margin:0 auto;padding:20px 30px 35px;min-height:100%}
+.hero{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:13px;padding:20px 0 42px}
+.hero .logo{width:47px;height:47px;border-radius:16px;box-shadow:0 8px 30px rgba(45,37,65,.12)}
+.hero .logo::before{font-size:24px}
+.hero h1{font-size:clamp(27px,3vw,35px);letter-spacing:-.055em;font-weight:690;line-height:1.2;margin:4px 0 0}
+.hero p{color:var(--muted);max-width:440px;font-size:14px;margin:0 0 13px}
+.sugs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:min(100%,570px);margin-top:6px;text-align:left}
+.sugs button{border:1px solid var(--line);background:var(--card);box-shadow:0 2px 5px rgba(25,25,25,.02);border-radius:15px;min-height:76px;padding:13px 15px;text-align:left;display:flex;flex-direction:column;justify-content:center;gap:3px;transition:border-color .16s,transform .16s,background .16s}
+.sugs button:hover{background:var(--soft);border-color:color-mix(in srgb,var(--text) 16%,var(--line));transform:translateY(-2px)}
+.sugs button .sug-head{font-weight:650;font-size:13.5px;color:var(--text)}
+.sugs button .sug-sub{font-size:11.5px;color:var(--muted)}
+.row{display:flex;align-items:flex-start;gap:14px;margin:0 0 26px;min-width:0}
+.row.u{justify-content:flex-end;margin-top:10px;margin-bottom:28px}
+.bub{min-width:0;max-width:100%;overflow-wrap:anywhere;font-size:14.5px;line-height:1.78}
+.u .bub{background:var(--user);border-radius:19px;padding:11px 16px;max-width:min(81%,600px);white-space:pre-wrap;line-height:1.6}
+.bub p{margin:0 0 .78em}.bub p:last-child{margin:0}
+.bub ul,.bub ol{padding-left:23px;margin:5px 0 14px}
+.bub li{margin:4px 0}
+.bub h1,.bub h2,.bub h3{line-height:1.35;letter-spacing:-.03em;margin:1.2em 0 .55em}
+.bub h1{font-size:1.45em}.bub h2{font-size:1.22em}.bub h3{font-size:1.08em}
+.bub code{background:var(--panel2);padding:2px 5px;border-radius:5px;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.bub a{color:var(--accent);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px}
+.pre{background:var(--soft);border:1px solid var(--line);border-radius:13px;margin:.8em 0 1.1em;overflow:hidden;max-width:100%}
+.pre .h{display:flex;justify-content:space-between;align-items:center;gap:9px;background:var(--panel2);border-bottom:1px solid var(--line);padding:7px 13px;font:12px ui-monospace,monospace;color:var(--muted)}
+.pre .h .code-actions{display:flex;gap:5px;align-items:center}
+.pre .h button{border:0;background:transparent;border-radius:6px;padding:5px 7px;color:var(--muted);font-family:inherit;font-size:11px}
+.pre .h button:hover{background:var(--hover);color:var(--text)}
+.pre pre{padding:14px 16px;margin:0;overflow:auto;font:12.5px/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.pre code{background:transparent;padding:0}
+.dots{display:inline-flex;gap:5px;padding:12px 0}.dots i{width:7px;height:7px;background:var(--muted);border-radius:50%;animation:dotPulse 1.1s infinite}.dots i:nth-child(2){animation-delay:.14s}.dots i:nth-child(3){animation-delay:.28s}
+@keyframes dotPulse{0%,70%,100%{opacity:.25;transform:scale(.75)}35%{opacity:1;transform:scale(1)}}
+.err{color:var(--danger);background:color-mix(in srgb,var(--danger) 7%,var(--bg));border:1px solid color-mix(in srgb,var(--danger) 20%,var(--bg));padding:10px 12px;border-radius:11px}
+.message-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:12px;opacity:.42;transition:opacity .15s}
+.row:hover .message-actions{opacity:1}
+.message-actions button{border:0;background:transparent;color:var(--muted);font-size:11.5px;padding:5px 7px;border-radius:8px}
+.message-actions button:hover{background:var(--hover);color:var(--text)}
+/* Composer */
+.comp{flex-shrink:0;padding:8px 25px calc(17px + env(safe-area-inset-bottom,0px));background:var(--bg)}
+.box{max-width:764px;margin:0 auto;display:flex;flex-direction:column;gap:3px;padding:13px 13px 11px 16px;background:var(--panel);border:1px solid color-mix(in srgb,var(--line) 93%,var(--text));border-radius:24px;box-shadow:0 5px 26px rgba(0,0,0,.06);transition:border-color .15s,box-shadow .15s}
+.box:focus-within{border-color:color-mix(in srgb,var(--accent) 38%,var(--line));box-shadow:0 6px 25px rgba(0,0,0,.08)}
+#inp{min-height:35px;width:100%;max-height:195px;overflow-y:auto;border:0;outline:0;resize:none;background:transparent;padding:5px 5px 7px 3px;line-height:1.55;color:var(--text);font-size:14.5px}
+#inp::placeholder{color:var(--muted)}
+.composer-tools{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:40px}
+.composer-left{display:flex;align-items:center;gap:9px}
+.attach{display:grid;place-items:center;width:37px;height:37px;border:1px solid var(--line);border-radius:50%;background:transparent;color:var(--text)}
+.attach:hover{background:var(--hover)}
+.attach .ui-icon{width:18px;height:18px}
+.attach-caption{font-size:11px;color:var(--muted);letter-spacing:.01em}
+.send{width:37px;height:37px;display:grid;place-items:center;background:#202020;color:#fff;border-radius:50%;border:0;flex-shrink:0;transition:transform .16s,background .16s}
+.send:hover:not(:disabled){background:#444;transform:translateY(-1px)}
+.send:disabled{background:var(--hover);color:var(--muted);opacity:1}
+.send svg{width:18px;height:18px}
+.note{max-width:760px;margin:10px auto 0;text-align:center;color:var(--muted);font-size:10.5px;line-height:1.5}
+.attachment-tray{max-width:764px;margin:10px auto 0;display:flex;flex-wrap:wrap;gap:8px}
+.attachment-item{position:relative;width:94px;min-height:78px;display:flex;flex-direction:column;gap:5px;border:1px solid var(--line);background:var(--panel2);border-radius:12px;padding:6px;overflow:hidden}
+.attachment-item img{width:100%;height:66px;object-fit:cover;border-radius:7px}
+.attachment-item .file-icon{font-size:24px;text-align:center;line-height:41px}
+.attachment-item .file-name{font-size:10px;color:var(--muted);white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.remove-attachment{position:absolute;right:3px;top:3px;width:22px;height:22px;border:0;border-radius:50%;background:var(--text);color:var(--bg);font-size:15px}
+.attachment-hint{width:100%;color:var(--muted);font-size:11px}
+.user-attachments{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;max-width:380px}
+.user-attachments img{width:min(180px,42vw);height:142px;object-fit:cover;border-radius:13px;border:1px solid var(--line)}
+.user-file{display:flex;align-items:center;gap:7px;padding:7px 10px;border-radius:10px;background:var(--panel2);font-size:12px;max-width:230px}
+.user-file span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Dialogs */
+.mod{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:16px;background:var(--overlay);backdrop-filter:blur(5px)}
+.mod.on{display:flex}
+.card{background:var(--card);border:1px solid var(--line);width:100%;max-width:460px;padding:26px;border-radius:22px;display:flex;flex-direction:column;gap:13px;box-shadow:var(--shadow);max-height:92dvh;overflow:auto}
+.card h2{font-size:21px;letter-spacing:-.04em;font-weight:720;margin:0}
+.card label{display:flex;flex-direction:column;gap:7px;color:var(--muted);font-size:12px;font-weight:590}
+.card textarea,.admin-email-input{background:var(--soft);color:var(--text);border:1px solid var(--line);border-radius:11px;padding:12px 13px;outline:0;width:100%}
+.card textarea{min-height:130px;max-height:260px;resize:vertical}
+.card textarea:focus,.admin-email-input:focus{border-color:var(--accent)}
+.btns{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}
+.btn{padding:10px 15px;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:10px;font-size:13px;font-weight:610}
+.btn:hover{filter:brightness(.97)}
+.btn.p{border-color:transparent;background:var(--text);color:var(--bg)}
+.pro-card{text-align:center;max-width:420px;gap:15px}
+.pro-kicker{font-size:10px;font-weight:750;color:var(--accent);letter-spacing:.18em}
+.pro-card h2{font-size:27px}
+.pro-description{font-size:12.5px;line-height:1.6;color:var(--muted);margin:0}
+.pro-price-line{display:flex;justify-content:center;align-items:baseline;gap:9px;margin:6px 0}
+.old-price{font-size:21px;text-decoration:line-through;color:var(--muted)}
+.new-price{font-size:50px;font-weight:760;letter-spacing:-.065em;color:var(--text)}
+.per-month{color:var(--muted);font-size:13px}
+.pro-price-note{font-size:12px;color:var(--muted)}
+.pro-buy{width:100%;font-size:14px;padding:13px}
+.admin-card{max-height:min(88dvh,740px)}
+.admin-feedback{min-height:17px;font-size:12px;color:var(--accent)}
+.grant-list-title{font-size:12px;font-weight:750}
+.grant-list{display:flex;flex-direction:column;gap:8px;max-height:255px;overflow:auto}
+.grant-empty{text-align:center;color:var(--muted);padding:14px 10px;border-radius:11px;border:1px dashed var(--line);font-size:12px}
+.grant-row{display:flex;align-items:center;gap:10px;padding:10px 11px;border:1px solid var(--line);border-radius:12px;background:var(--soft)}
+.grant-meta{flex:1;min-width:0}.grant-email{font-size:12px;font-weight:620;overflow-wrap:anywhere}.grant-expiry{color:var(--muted);font-size:10.5px;margin-top:3px}
+.grant-remove{padding:7px 10px;border-radius:9px;border:1px solid color-mix(in srgb,var(--danger) 28%,var(--line));background:transparent;color:var(--danger);font-size:11px}
+/* Authentication */
+.auth-screen{position:fixed;inset:0;height:100%;height:100dvh;display:flex;align-items:center;justify-content:center;overflow:auto;padding:20px;background:var(--soft);z-index:60}
+.auth-card{width:100%;max-width:415px;padding:28px;background:var(--card);border:1px solid var(--line);border-radius:25px;box-shadow:var(--shadow)}
+.auth-back{border:0;background:transparent;color:var(--muted);padding:7px 1px;font-size:12px;margin-bottom:14px}
+.auth-back:hover{color:var(--text)}
+.auth-head{text-align:center;margin-bottom:24px}
+.auth-head .logo{width:55px;height:55px;margin:0 auto 15px;border-radius:17px}
+.auth-head .logo::before{font-size:23px}
+.auth-head h1{font-weight:750;letter-spacing:-.055em;font-size:26px;margin:0}
+.auth-head p{font-size:13px;color:var(--muted);margin-top:4px}
+.auth-google{display:flex;justify-content:center;align-items:center;gap:10px;border:1px solid var(--line);border-radius:12px;width:100%;padding:12px 15px;background:var(--panel);font-size:13px;font-weight:650;color:var(--text)}
+.auth-google:hover{background:var(--hover)}
+.google-g{font-size:19px;color:#4285f4;font-weight:800}
+.auth-divider{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:11px;margin:19px 0}
+.auth-divider::before,.auth-divider::after{content:"";height:1px;flex:1;background:var(--line)}
+.auth-form{display:flex;flex-direction:column;gap:11px}
+.auth-form input{width:100%;padding:12px 14px;border:1px solid var(--line);background:var(--soft);color:var(--text);border-radius:10px;outline:0;font-size:13px}
+.auth-form input:focus{border-color:var(--accent)}
+.auth-primary{width:100%;padding:12px;border:0;border-radius:11px;background:var(--text);color:var(--bg);font-weight:700;font-size:13px}
+.auth-switch{width:100%;margin-top:16px;background:transparent;color:var(--accent);font-size:12px;border:0}
+.auth-error{display:none;background:color-mix(in srgb,var(--danger) 10%,var(--bg));color:var(--danger);border-radius:9px;padding:9px;font-size:12px}
+.auth-info{text-align:center;margin-top:18px;color:var(--muted);font-size:11px}
+.back{display:none}
+/* Sidebar collapsed on desktop */
+.app.sidebar-collapsed .side{width:0;min-width:0;padding-left:0;padding-right:0;border-right:0}
+/* Scrolling */
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--muted) 28%,transparent);border-radius:12px}
+/* Responsive */
+@media(max-width:900px){
+  .side{position:fixed;inset:0 auto 0 0;width:min(286px,84vw);min-width:0;transform:translateX(-105%);box-shadow:8px 0 30px rgba(0,0,0,.08)}
+  .side.on{transform:translateX(0)}
+  .app.sidebar-collapsed .side{width:min(286px,84vw);padding-left:12px;padding-right:12px}
+  .back.on{display:block;position:fixed;inset:0;background:var(--overlay);z-index:21}
+  .burger{display:grid}.sidebar-toggle{display:none}
+  .top{padding:9px 16px;min-height:64px;padding-top:calc(9px + env(safe-area-inset-top,0px))}
+}
+@media(max-width:600px){
+  .top{min-height:58px;padding-left:9px;padding-right:11px;gap:3px}
+  .title{font-size:14px;max-width:32vw}
+  .model-select{font-size:12px;max-width:125px;padding-left:6px;padding-right:20px;background-position:right 2px center}
+  .top-pro{display:none}
+  .theme-toggle,.top-new,.burger{width:34px;height:34px}
+  .wrap{padding:12px 17px 22px}
+  .hero{padding:20px 0 27px}
+  .hero h1{font-size:28px}
+  .hero p{font-size:13px}
+  .sugs{gap:8px}
+  .sugs button{min-height:75px;padding:10px 11px}
+  .sugs button .sug-head{font-size:12px}
+  .sugs button .sug-sub{font-size:10px}
+  .row{gap:9px;margin-bottom:21px}
+  .bub{font-size:14px}
+  .u .bub{max-width:87%;padding:10px 12px}
+  .av{width:27px;height:27px}
+  .comp{padding:6px 10px calc(10px + env(safe-area-inset-bottom,0px))}
+  .box{border-radius:22px;padding:10px 10px 9px 12px}
+  #inp{font-size:16px}
+  .note{font-size:9.5px;margin-top:7px}
+  .message-actions{opacity:.85}
+  .card{padding:22px}
+  .pro-status{font-size:10.5px;gap:5px}
+}
+@media(max-width:365px){.title{display:none}.sugs{grid-template-columns:1fr}.sugs button{min-height:58px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
 
 </style>
 </head>
@@ -736,63 +330,44 @@ textarea::placeholder {color:var(--muted)}
 <div class="app" id="app">
 
   <aside class="side" id="side">
-
-    <div class="brand">
-      <div class="logo"></div>
-      Venus AI
+  <div class="brand"><div class="logo"></div><span>Venus AI</span><em>STUDIO</em></div>
+  <button class="new" id="newBtn" type="button"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L10 16l-4 1 1-4Z"/><path d="M4 4h7M4 4v16h16v-7"/></svg><span class="new-label">Новый чат</span></button>
+  <button class="new pro-upgrade" id="upgradeBtn" type="button"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3ZM19 17l.7 2.3L22 20l-2.3.7L19 23l-.7-2.3L16 20l2.3-.7L19 17Z"/></svg><span id="upgradeText">Перейти на Pro</span></button>
+  <div class="sidebar-subtitle">История чатов</div>
+  <div class="list" id="list"></div>
+  <div class="foot">
+    <div class="foot-actions">
+      <button class="new" id="setBtn" type="button"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06-1.91 1.91-.06-.06A1.65 1.65 0 0 0 16 18.4a1.65 1.65 0 0 0-1 .6 1.65 1.65 0 0 0-.4 1.07V21h-2.7v-.93a1.65 1.65 0 0 0-1.25-1.6 1.65 1.65 0 0 0-1.67.37l-.06.06-1.91-1.91.06-.06A1.65 1.65 0 0 0 7.4 15a1.65 1.65 0 0 0-1.47-1H5v-2.7h.93a1.65 1.65 0 0 0 1.6-1.25 1.65 1.65 0 0 0-.37-1.67l-.06-.06 1.91-1.91.06.06A1.65 1.65 0 0 0 11 6.6a1.65 1.65 0 0 0 1-1.53V4h2.7v1.07a1.65 1.65 0 0 0 1.25 1.6 1.65 1.65 0 0 0 1.67-.37l.06-.06 1.91 1.91-.06.06A1.65 1.65 0 0 0 18.4 10a1.65 1.65 0 0 0 1.47 1H21v2.7h-1.13A1.65 1.65 0 0 0 19.4 15Z"/></svg><span>Настройки</span></button>
+      <a class="new telegram" href="https://t.me/venus1ai" target="_blank" rel="noopener noreferrer"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.5 3-8.1 18-3.7-7.8L2 9.5 21.5 3ZM9.7 13.2 21.5 3"/></svg><span>Telegram</span></a>
     </div>
-
-    <button class="new" id="newBtn">＋ Новый чат</button>
-    <button class="new pro-upgrade" id="upgradeBtn" type="button">Перейти на Pro</button>
-
-    <div class="list" id="list"></div>
-
-    <div class="foot">
-
-      <div class="foot-actions">
-
-        <button class="new" id="setBtn">Настройки</button>
-
-        <a class="new telegram"
-          href="https://t.me/venus1ai"
-          target="_blank"
-          rel="noopener">
-          Telegram
-        </a>
-
-      </div>
-
-      <button class="new admin-open" id="adminBtn" type="button" hidden>Выдать Pro</button>
-
-      <button class="new register-guest" id="registerBtn" type="button">
-        Войти / Регистрация
-      </button>
-
-      <div class="account">
-        <div class="account-avatar"></div>
-
-        <div class="account-info">
-          <div id="accountName">Пользователь</div>
-          <small id="accountEmail"></small>
-        </div>
-
-        <button class="logout" id="logoutBtn" title="Выйти" hidden>
-          Выйти
-        </button>
-      </div>
-
+    <button class="new admin-open" id="adminBtn" type="button" hidden><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg><span>Управление Pro</span></button>
+    <button class="new register-guest" id="registerBtn" type="button">Войти / Регистрация</button>
+    <div class="account">
+      <div class="account-avatar" aria-hidden="true"></div>
+      <div class="account-info"><div id="accountName">Пользователь</div><small id="accountEmail"></small></div>
+      <button class="logout" id="logoutBtn" type="button" title="Выйти из аккаунта" aria-label="Выйти" hidden><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></svg></button>
     </div>
-
-  </aside>
+  </div>
+</aside>
 
   <div class="back" id="back"></div>
 
   <main class="main">
 
     <div class="top">
-      <button class="burger" id="burger">☰</button>
-      <div class="title" id="ttl">Venus AI</div>
-    </div>
+  <button class="burger" id="burger" type="button" aria-label="Открыть меню"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Скрыть боковую панель" title="Боковая панель"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18"/></svg></button>
+  <div class="title" id="ttl">Venus AI</div>
+  <select class="model-select" id="modelSelect" title="Модель Venus AI" aria-label="Выбрать модель">
+    <option value="cx/gpt-6-luna">Flash</option>
+    <option value="cx/gpt-6.1-sol">High</option>
+    <option id="proModelOption" value="cx/gpt-6-astra" hidden>Pro High — ASTRO</option>
+  </select>
+  <div class="top-right">
+    <button class="top-new" id="topNewBtn" type="button" title="Новый чат" aria-label="Новый чат"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L10 16l-4 1 1-4Z"/><path d="M4 4h7M4 4v16h16v-7"/></svg></button>
+    <button class="theme-toggle" id="themeToggle" type="button" title="Сменить тему" aria-label="Сменить тему"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.985 12.486A9 9 0 0 1 11.514 3.01 9 9 0 1 0 20.985 12.486Z"/></svg></button>
+  </div>
+</div>
 
     <div class="pro-status" id="proStatus" hidden>
       <strong>Подписка оформлена</strong>
@@ -804,46 +379,20 @@ textarea::placeholder {color:var(--muted)}
     </div>
 
     <div class="comp">
-
-      <div class="box">
-
-        <textarea
-          id="inp"
-          rows="1"
-          placeholder="Напишите сообщение Venus AI…"
-        ></textarea>
-
-        <button class="attach" id="attachBtn" type="button" title="Прикрепить фото или файл" aria-label="Прикрепить фото или файл">+</button>
-        <input id="fileInput" type="file" hidden multiple
-          accept="image/*,.pdf,.txt,.md,.json,.csv,.html,.htm,.css,.js,.mjs,.ts,.tsx,.jsx,.py,.lua,.java,.c,.cpp,.h,.cs,.go,.rs,.sql,.xml,.yaml,.yml,.toml,.ini,.log,.sh,.docx,.xlsx" />
-
-        <select class="model-select" id="modelSelect" title="Модель">
-          <option value="cx/gpt-6-luna">Flash</option>
-          <option value="cx/gpt-6.1-sol">High</option>
-          <option id="proModelOption" value="cx/gpt-6-astra" hidden>Pro High — GPT-6 ASTRO</option>
-        </select>
-
-        <button class="send" id="send" disabled
-          aria-label="Отправить">
-
-          <svg width="18" height="18" viewBox="0 0 24 24"
-            fill="none" stroke="currentColor" stroke-width="2.4"
-            stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 19V5M5 12l7-7 7 7"/>
-          </svg>
-
-        </button>
-
+  <div class="box">
+    <textarea id="inp" rows="1" placeholder="Спросите что-нибудь у Venus AI…" aria-label="Сообщение"></textarea>
+    <div class="composer-tools">
+      <div class="composer-left">
+        <button class="attach" id="attachBtn" type="button" title="Прикрепить файл" aria-label="Прикрепить файл"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.4 11.6-8.8 8.8a6 6 0 0 1-8.5-8.5l9.9-9.9a4 4 0 0 1 5.7 5.7l-9.9 9.9a2 2 0 0 1-2.8-2.8l8.5-8.5"/></svg></button>
+        <span class="attach-caption">Фото и файлы</span>
       </div>
-
-      <div class="attachment-tray" id="attachmentTray" hidden></div>
-
-      <div class="note">
-        Фото, PDF, DOCX, XLSX и текстовые файлы можно прикреплять через скрепку.
-        В режиме «Авто» используется резерв моделей, но ответ всегда один.
-      </div>
-
+      <input id="fileInput" type="file" hidden multiple accept="image/*,.pdf,.txt,.md,.json,.csv,.html,.htm,.css,.js,.mjs,.ts,.tsx,.jsx,.py,.lua,.java,.c,.cpp,.h,.cs,.go,.rs,.sql,.xml,.yaml,.yml,.toml,.ini,.log,.sh,.docx,.xlsx" />
+      <button class="send" id="send" type="button" disabled aria-label="Отправить сообщение"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
     </div>
+  </div>
+  <div class="attachment-tray" id="attachmentTray" hidden></div>
+  <div class="note">Venus AI может допускать ошибки. Проверяйте важную информацию.</div>
+</div>
 
   </main>
 </div>
@@ -1087,7 +636,7 @@ function refreshProUI() {
   $("adminBtn").hidden = !isAdmin;
   $("proModelOption").hidden = !hasPro;
   $("proStatus").hidden = !hasPro;
-  $("upgradeBtn").textContent = hasPro ? "Pro — подписка активна" : "Перейти на Pro";
+  $("upgradeText").textContent = hasPro ? "Pro — подписка активна" : "Перейти на Pro";
   if (!hasPro && $("modelSelect").value === MODELS.pro) {
     $("modelSelect").value = MODELS.flash;
     if (currentUser?.uid) store.set(modelKey(currentUser.uid), MODELS.flash);
@@ -1100,7 +649,7 @@ async function syncProForUser(user) {
   if (!user?.uid || !user.email || user.uid === "guest") return;
   try {
     await set(ref(database, `venusPro/userIndex/${user.uid}`), {
-      email: user.email,
+      email: normalizeEmail(user.email),
       updatedAt: Date.now()
     });
     const snapshot = await get(ref(database, `venusPro/grants/${user.uid}`));
@@ -1412,7 +961,7 @@ onAuthStateChanged(auth,user => {
   $("logoutBtn").hidden = !user;
   $("registerBtn").hidden = !!user;
   $("list").hidden = !user;
-  $("newBtn").textContent = user ? "＋ Новый чат" : "＋ Новый чат";
+  $("newBtn").querySelector(".new-label").textContent = "Новый чат";
 
   $("kSys").value = systemPrompt;
 
@@ -1583,7 +1132,7 @@ function renderList() {
       <button class="x" aria-label="Удалить">✕</button>
     `;
 
-    b.firstChild.textContent=c.title;
+    b.querySelector("span").textContent=c.title;
 
     b.onclick=e => {
 
@@ -1619,29 +1168,28 @@ function renderList() {
 /* HOME */
 
 function hero() {
-
-  const suggestions=[
-    "Придумай идею для стартапа",
-    "Объясни квантовую физику просто",
-    "Напиши письмо начальнику",
-    "Помоги выучить английский"
+  const suggestions = [
+    {title:"Придумать идею",sub:"Для нового проекта",query:"Придумай идею для стартапа"},
+    {title:"Объяснить сложное",sub:"Просто и на примерах",query:"Объясни квантовую физику просто"},
+    {title:"Написать текст",sub:"Письмо или сообщение",query:"Напиши письмо начальнику"},
+    {title:"Изучить новое",sub:"Составить план обучения",query:"Помоги выучить английский"}
   ];
-
   return `
     <div class="hero">
       <div class="logo"></div>
-      <h1>Чем могу помочь?</h1>
-      <p>Я Venus AI. Задайте вопрос, попросите написать текст или код.</p>
+      <h1>С чего начнём?</h1>
+      <p>Спросите о чём угодно, загрузите файл или начните новый проект.</p>
       <div class="sugs">
         ${suggestions.map(x=>`
-          <button data-s="${esc(x)}">${esc(x)}</button>
+          <button type="button" data-s="${esc(x.query)}">
+            <span class="sug-head">${esc(x.title)}</span>
+            <span class="sug-sub">${esc(x.sub)}</span>
+          </button>
         `).join("")}
       </div>
     </div>
   `;
-
 }
-
 
 /* MESSAGES */
 
@@ -2000,19 +1548,6 @@ async function send(text,attachmentsOverride=null) {
     : attachmentsOverride.slice();
 
   if((!text && !chosenAttachments.length)||busy||!currentUser)return;
-
-  // API требует Firebase ID token. Гостю показываем окно входа,
-  // не очищая текст и выбранные вложения.
-  const firebaseUser = auth.currentUser ||
-    (currentUser.uid !== "guest" ? currentUser : null);
-
-  if (!firebaseUser) {
-    if (text && !$("inp").value.trim()) $("inp").value = text;
-    openAuth("login");
-    authError("Чтобы отправлять сообщения, войдите в аккаунт Venus AI.");
-    return;
-  }
-
   if(!text && chosenAttachments.length) text="Посмотри прикреплённые файлы и помоги с ними.";
 
   let c=active();
@@ -2061,25 +1596,18 @@ async function send(text,attachmentsOverride=null) {
     const userPayloads=messages.filter(x=>x.role==="user");
     if(!userPayloads.length) throw new Error("Нет сообщений для отправки.");
     const selectedModel=$("modelSelect").value;
-    const apiModel = selectedModel === MODELS.pro
-      ? "astro"
-      : selectedModel === MODELS.high
-        ? "high"
-        : "flash";
 
-    // Всегда отправляем проверенный Firebase ID token.
-    const idToken = await firebaseUser.getIdToken();
-    const requestHeaders = {
-      "Content-Type":"application/json",
-      "Authorization": `Bearer ${idToken}`
-    };
+    const requestHeaders = {"Content-Type":"application/json"};
+    if (auth.currentUser) {
+      requestHeaders.Authorization = `Bearer ${await auth.currentUser.getIdToken()}`;
+    }
 
     const r=await fetch(API_URL,{
       method:"POST",
       signal:ctrl.signal,
       headers:requestHeaders,
       body:JSON.stringify({
-        model:apiModel,
+        model:selectedModel,
         messages,
         stream:true,
         max_tokens:8192
@@ -2280,88 +1808,42 @@ $("adminMod").addEventListener("click", e => {
   if (e.target === $("adminMod")) $("adminMod").classList.remove("on");
 });
 
-
 $("grantProBtn").onclick = async () => {
   if (normalizeEmail(currentUser?.email) !== ADMIN_EMAIL) {
     $("adminFeedback").textContent = "Нет прав администратора.";
     return;
   }
-
   const email = normalizeEmail($("grantEmail").value);
-
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     $("adminFeedback").textContent = "Введите корректный email.";
     return;
   }
-
   const button = $("grantProBtn");
   button.disabled = true;
-
-  let step = "Проверка авторизации";
-
   try {
-    await auth.currentUser.getIdToken(true);
-
-    step = "Чтение venusPro/userIndex";
-
-    const usersSnapshot = await get(
-      ref(database, "venusPro/userIndex")
-    );
-
-    const users = usersSnapshot.exists()
-      ? usersSnapshot.val()
-      : {};
-
-    const found = Object.entries(users).find(
-      ([, profile]) => normalizeEmail(profile?.email) === email
-    );
-
+    const usersSnapshot = await get(ref(database, "venusPro/userIndex"));
+    const users = usersSnapshot.exists() ? usersSnapshot.val() : {};
+    const found = Object.entries(users).find(([, profile]) => normalizeEmail(profile?.email) === email);
     if (!found) {
-      throw new Error("Пользователь не найден в userIndex.");
+      throw new Error("Этот аккаунт ещё не входил на сайт. Попросите пользователя один раз авторизоваться, затем выдайте Pro.");
     }
-
     const uid = found[0];
     const now = Date.now();
-
-    const grant = {
-      email,
-      grantedAt: now,
-      expiresAt: now + PRO_DURATION_MS,
-      grantedBy: ADMIN_EMAIL
-    };
-
-    step = "Запись venusPro/grants/" + uid;
-
+    const grant = { email, grantedAt: now, expiresAt: now + PRO_DURATION_MS, grantedBy: ADMIN_EMAIL };
     await set(ref(database, `venusPro/grants/${uid}`), grant);
-
-    step = "Обновление списка подписок";
-
     const cached = getProGrants();
     cached[email] = grant;
     saveProGrants(cached);
-
     $("grantEmail").value = "";
-    $("adminFeedback").textContent =
-      `Pro выдан для ${email} на 30 дней.`;
-
+    $("adminFeedback").textContent = `Pro выдан для ${email} на 30 дней.`;
     await renderAdminGrantList();
-
-    if (normalizeEmail(currentUser?.email) === email) {
-      refreshProUI();
-    }
-
+    if (normalizeEmail(currentUser?.email) === email) refreshProUI();
   } catch (error) {
-    console.error("VENUS PRO ERROR:", step, error);
-
-    $("adminFeedback").textContent =
-      "Ошибка на этапе: " + step +
-      " | " + (error.code || error.message);
-
+    $("adminFeedback").textContent = error.message || "Не удалось выдать Pro. Проверьте правила Firebase.";
   } finally {
     button.disabled = false;
   }
 };
-
 
 $("grantList").addEventListener("click", async e => {
   const button = e.target.closest("[data-remove-grant]");
@@ -2417,6 +1899,37 @@ $("save").onclick=()=>{
 
 };
 
+
+
+/* THEME + LAYOUT CONTROLS */
+const VENUS_THEME_KEY = "venus_theme_v2";
+function applyVenusTheme(theme) {
+  const nextTheme = theme === "dark" ? "dark" : "light";
+  document.documentElement.dataset.theme = nextTheme;
+  try { localStorage.setItem(VENUS_THEME_KEY, nextTheme); } catch (e) {}
+  const btn = $("themeToggle");
+  btn.setAttribute("aria-label", nextTheme === "dark" ? "Включить светлую тему" : "Включить тёмную тему");
+  btn.innerHTML = nextTheme === "dark"
+    ? `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"/></svg>`
+    : `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.985 12.486A9 9 0 0 1 11.514 3.01 9 9 0 1 0 20.985 12.486Z"/></svg>`;
+}
+applyVenusTheme(document.documentElement.dataset.theme);
+$("themeToggle").onclick = () => applyVenusTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+$("sidebarToggle").onclick = () => {
+  const collapsed = $("app").classList.toggle("sidebar-collapsed");
+  $("sidebarToggle").setAttribute("aria-label", collapsed ? "Показать боковую панель" : "Скрыть боковую панель");
+};
+$("topNewBtn").onclick = () => $("newBtn").click();
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    closeSide();
+    for (const id of ["mod", "proMod", "adminMod"]) $(id).classList.remove("on");
+  }
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "o") {
+    e.preventDefault();
+    $("newBtn").click();
+  }
+});
 
 /* EVENTS */
 
