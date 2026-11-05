@@ -1100,7 +1100,7 @@ async function syncProForUser(user) {
   if (!user?.uid || !user.email || user.uid === "guest") return;
   try {
     await set(ref(database, `venusPro/userIndex/${user.uid}`), {
-      email: normalizeEmail(user.email),
+      email: user.email,
       updatedAt: Date.now()
     });
     const snapshot = await get(ref(database, `venusPro/grants/${user.uid}`));
