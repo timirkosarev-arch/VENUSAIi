@@ -553,7 +553,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
       <button class="artifact-close" id="artifactClose" type="button" title="Закрыть" aria-label="Закрыть">×</button>
     </header>
     <div class="artifact-codebar"><strong id="artifactLanguage">Код</strong><span id="artifactStats">0 строк</span></div>
-    <div class="artifact-warning" id="artifactWarning" hidden>Этот код не завершён. Проверьте его перед запуском. Если генерация оборвалась, попросите Venus AI продолжить ответ.</div>
+    <div class="artifact-warning" id="artifactWarning" hidden>Генерация этого файла ещё продолжается. Вернитесь в чат и нажмите «Продолжить генерацию».</div>
     <div class="artifact-codearea"><pre><code id="artifactCode"></code></pre></div>
     <footer class="artifact-dialog-footer"><span>Код можно копировать и сохранять в файл</span><span id="artifactFilename">code.txt</span></footer>
   </section>
@@ -1170,6 +1170,16 @@ function filenameForCodeBlock(block) {
   return safeCodeFilename(block.filename)||fallback;
 }
 
+function isValidCodeBlock(block) {
+  if(!block.complete || !block.c.trim()) return false;
+  const name=filenameForCodeBlock(block);
+  if(/\.html?$/i.test(name) && /<html(?:\s|>)/i.test(block.c) && !/<\/html\s*>/i.test(block.c)) return false;
+  if(/\.json$/i.test(name)) {
+    try { JSON.parse(block.c); } catch { return false; }
+  }
+  return true;
+}
+
 function inspectCodeFiles(source) {
   const parsed=splitCodeArtifacts(source);
   const files=parsed.blocks.filter(b=>b.c.trim()).map(b=>({
@@ -1178,7 +1188,7 @@ function inspectCodeFiles(source) {
   const issues=[];
   if(!files.length) issues.push("Модель не вернула файл в блоке кода");
   if(files.some(f=>!f.complete)) issues.push("Блок кода не завершён");
-  if(files.some(f=>/\b(?:TODO|FIXME)\s*[:：]|остальной код|код без изменений|your code here|insert code here/i.test(f.text)))
+  if(files.some(f=>/(?:\[\s*вставьте\s+(?:код|сюда)\s*\]|остальной код без изменений|your code here|insert code here)/i.test(f.text)))
     issues.push("В коде есть явные незаполненные места");
   for(const f of files) {
     if(/\.html?$/i.test(f.name)&&/<html(?:\s|>)/i.test(f.text)&&!/<\/html\s*>/i.test(f.text))
@@ -1270,7 +1280,7 @@ function md(t,forceIncomplete=false) {
     const language=rawLanguage||"text";
     const fileName=filenameForCodeBlock(block);
     const code=block.c; // retain every character and trailing newline
-    const complete=block.complete && !forceIncomplete;
+    const complete=block.complete && !forceIncomplete && isValidCodeBlock(block);
     const lines=code ? code.split("\n").length : 0;
     const sample=(code.split("\n").find(line=>line.trim())||"Нажмите, чтобы открыть код").trim().slice(0,72);
     return `
@@ -1397,10 +1407,13 @@ function msgHTML(m,index) {
     <div class="row">
       <div class="av"></div>
       <div class="bub">
-        ${md(m.content || "",!!m.truncated)}
-        ${m.truncated ? `<div class="response-incomplete">${m.tokenBudgetHit ? "Достигнут общий предел ≈30 000 токенов кода. Незавершённый файл не помечен готовым. Уменьшите проект или разбейте его на файлы в отдельных запросах." : "Ответ мог быть обрезан из-за ограничения модели или обнаружены проблемы в файле. Неполный артефакт нельзя считать готовым."}</div>` : ''}
+        ${md(m.content || "", !!m.truncated && !m.codeBuild)}
+        ${m.codeBuild && m.resuming ? '<div class="code-build-result">Дополняю код и проверяю результат…</div>' : ''}
+        ${m.truncated && m.codeBuild && !m.resuming ? `<div class="code-build-result">${m.tokenBudgetHit ? "Достигнут предел 30 000 токенов для одного проекта. Можно создать более компактную версию." : "Код сохранён. Можно продолжить генерацию с места остановки."}${m.resumeError ? " " + esc(m.resumeError) : ""}</div>` : ''}
+        ${m.truncated && !m.codeBuild ? '<div class="code-build-result">Ответ прервался. Попробуйте повторить запрос.</div>' : ''}
         ${m.codeBuild && !m.truncated && inspectCodeFiles(m.content).files.length ? '<div class="code-build-result">Файл готов к скачиванию. Откройте артефакт или сохраните файлы напрямую.</div>' : ''}
         <div class="message-actions">
+          ${m.codeBuild && m.truncated && !m.resuming ? `<button data-resume-code data-index="${index}" type="button">${m.tokenBudgetHit ? "Сделать компактную версию" : "Продолжить генерацию"}</button>` : ''}
           ${m.codeBuild && !m.truncated && inspectCodeFiles(m.content).files.length ? `<button data-download-project data-index="${index}" type="button">${inspectCodeFiles(m.content).files.length===1?"Скачать файл":"Скачать проект ZIP"}</button>` : ''}
           <button data-copy-answer data-index="${index}">Копировать</button>
           <button data-share-answer data-index="${index}">Поделиться</button>
@@ -2118,10 +2131,40 @@ async function send(text,attachmentsOverride=null) {
     }
     if(codeBuild) {
       progress(2,"Проверяю целостность блоков кода и имена файлов.");
-      const checked=inspectCodeFiles(am.content);
+      let checked=inspectCodeFiles(am.content);
+      // A closed code fence can still contain invalid JSON or an HTML document
+      // with missing closing tags. Ask for a complete replacement, not a suffix.
+      if(!budgetHit && !hasUnclosedCodeFence(am.content) && checked.issues.length && estimateOutputTokens(am.content)<MAX_TOTAL_CODE_TOKENS-200) {
+        for(let fix=0;fix<2;fix++) {
+          if(ctrl.signal.aborted) throw new DOMException("Aborted","AbortError");
+          progress(2,"Исправляю структуру файлов: попытка " + (fix+1) + " из 2.");
+          try {
+            const replacement=await requestVenusOnce([
+              ...outputMessages,
+              {role:"assistant",content:am.content},
+              {role:"user",content:"Проверка обнаружила проблемы: " + checked.issues.join("; ") + ". Исправь ВСЕ ошибки и выдай ВСЕ исходные файлы полностью заново в блоках ``` с именами файлов. Никаких сокращений и заглушек."}
+            ],selectedModel,requestHeaders,ctrl.signal,MAX_TOKENS_PER_REQUEST);
+            const proposed=inspectCodeFiles(replacement);
+            if(replacement && !proposed.issues.length && estimateOutputTokens(replacement)<=MAX_TOTAL_CODE_TOKENS) {
+              am.content=replacement;
+              checked=proposed;
+              interrupted=false;
+              outputReason="stop";
+              break;
+            }
+          } catch(error) {
+            if(ctrl.signal.aborted) throw error;
+            console.warn("Venus AI repair attempt failed:",error);
+          }
+        }
+      }
       am.codeBuild=true;
       am.tokenBudgetHit=budgetHit;
-      am.truncated = budgetHit || outputReason==="length" || interrupted || checked.issues.length>0;
+      // A model may emit finish_reason=length *after* it fully closed all
+      // requested files. Judge the actual files, not just the reason string.
+      // A stream may omit its final [DONE] marker even when all code files
+      // arrived. Do not mislabel a structurally complete file as unfinished.
+      am.truncated = budgetHit || checked.issues.length>0;
       if(checked.issues.length) {
         console.warn("Venus AI: issues in generated code",checked.issues);
         // Do not expose a partially generated file as complete.
@@ -2158,6 +2201,112 @@ async function send(text,attachmentsOverride=null) {
   saveChats();
   upd();
   if(am.content)renderMsgs();
+}
+
+/* RESUME AN INCOMPLETE CODE ARTIFACT WITHOUT LOSING EXISTING LINES */
+async function resumeIncompleteCode(index) {
+  const c=active();
+  const message=c?.messages?.[index];
+  if(!message || message.role!=="assistant" || !message.codeBuild || !message.truncated || busy) return;
+  const original=c.messages.slice(0,index).reverse().find(m=>m.role==="user");
+  if(!original) return;
+
+  // Keep the 30K project-size promise. Regenerate a compact version instead
+  // of silently appending past the limit.
+  if(message.tokenBudgetHit || estimateOutputTokens(message.content)>=MAX_TOTAL_CODE_TOKENS-250) {
+    send(original.content + "\n\nСделай компактную, но полноценную рабочую версию, строго уложившись в 30 000 токенов исходного кода. Оставь все необходимые функции и файлы. Не пиши заглушки.");
+    return;
+  }
+  if(!auth.currentUser) {
+    openAuth("login");
+    authError("Войдите в аккаунт, чтобы продолжить генерацию.");
+    return;
+  }
+
+  busy=true;
+  ctrl=new AbortController();
+  message.resuming=true;
+  message.resumeError="";
+  upd();
+  renderMsgs();
+  try {
+    const headers={
+      "Content-Type":"application/json",
+      "Authorization":`Bearer ${await auth.currentUser.getIdToken()}`
+    };
+    const model=$("modelSelect").value;
+    let unchanged=0;
+    for(let round=0;round<8;round++) {
+      if(ctrl.signal.aborted) throw new DOMException("Aborted","AbortError");
+      const previous=message.content;
+      const budget=MAX_TOTAL_CODE_TOKENS-estimateOutputTokens(previous);
+      if(budget<250) { message.tokenBudgetHit=true;break; }
+      const openFence=hasUnclosedCodeFence(previous);
+      const currentIssues=inspectCodeFiles(previous).issues;
+      const needsReplacement=!openFence;
+      const instructions=openFence
+        ? "ДОПИШИ последний незавершённый блок кода строго с места обрыва. Верни ТОЛЬКО ещё не написанные символы кода, без нового открытия ``` и без повторений. Затем закрой блок тройными обратными кавычками. Все функции и теги должны быть закончены."
+        : "Выдай полностью исправленный ответ с целыми файлами ЗАНОВО. Проблемы: " + currentIssues.join("; ") + ". Для каждого файла: Файл: `имя.ext`, затем полный закрытый блок кода. Без сокращений и заглушек.";
+      const context=[
+        {role:"system",content:systemPrompt},
+        {role:"user",content:"Исходная задача: " + original.content},
+        {role:"assistant",content:previous.slice(-110000)},
+        {role:"user",content:instructions}
+      ];
+      const requestedTokens=needsReplacement
+        ? MAX_TOKENS_PER_REQUEST
+        : Math.min(MAX_TOKENS_PER_REQUEST,budget);
+      const response=await fetch(API_URL,{
+        method:"POST",headers,signal:ctrl.signal,
+        body:JSON.stringify({model,messages:context,stream:true,max_tokens:requestedTokens})
+      });
+      if(!response.ok) {
+        const errorText=await response.text().catch(()=>"");
+        throw new Error("Ошибка " + response.status + (errorText?": " + errorText.slice(0,220):""));
+      }
+      let extra="";
+      const result=await readVenusResponse(response,p=>{extra+=p;});
+      if(!extra.trim()) {unchanged++;if(unchanged>=2)break;continue;}
+      const candidate=needsReplacement ? extra : mergeCodeContinuation(previous,extra);
+      if(estimateOutputTokens(candidate)>MAX_TOTAL_CODE_TOKENS) {
+        message.tokenBudgetHit=true;
+        break;
+      }
+      if(needsReplacement) {
+        // Replacing code only when the new files pass checks avoids losing
+        // the user's earlier response to a failed repair attempt.
+        const repaired=inspectCodeFiles(candidate);
+        if(repaired.files.length && repaired.issues.length<=currentIssues.length) {
+          message.content=candidate;
+        }
+      } else {
+        message.content=candidate;
+      }
+      const issues=inspectCodeFiles(message.content).issues;
+      message.truncated=issues.length>0 || (result.interrupted && result.finishReason!=="stop");
+      message.tokenBudgetHit=false;
+      saveChats();
+      renderMsgs();
+      if(!message.truncated) break;
+      unchanged=message.content===previous?unchanged+1:0;
+      if(unchanged>=2)break;
+    }
+    const check=inspectCodeFiles(message.content);
+    message.truncated=message.tokenBudgetHit || check.issues.length>0;
+  } catch(error) {
+    if(error?.name!=="AbortError") {
+      message.resumeError="Не удалось продолжить: " + (error.message||"ошибка соединения");
+      console.error("Venus AI resume error:",error);
+    }
+    message.truncated=true;
+  } finally {
+    message.resuming=false;
+    busy=false;
+    ctrl=null;
+    saveChats();
+    upd();
+    renderMsgs();
+  }
 }
 
 /* SEND BUTTON */
@@ -2638,6 +2787,11 @@ $("wrap").addEventListener("click",async e=>{
   if(!c || !Number.isInteger(index))return;
   const message=c.messages[index];
   if(!message || message.role!=="assistant")return;
+
+  if(e.target.closest("[data-resume-code]")) {
+    await resumeIncompleteCode(index);
+    return;
+  }
 
   if(e.target.closest("[data-download-project]")) {
     if(message.truncated) { alert("Этот код ещё не завершён. Скачивание полного проекта недоступно.");return; }
