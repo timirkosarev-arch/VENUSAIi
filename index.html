@@ -818,15 +818,50 @@ function saveSystem() {
   store.set(sysKey(currentUser.uid),systemPrompt);
 }
 
-/* TEMPORARY ATTACHMENT STORAGE: memory only */
+/* Durable browser attachment storage: keeps source files after a reload. */
 const mediaStore = new Map();
-
+let mediaDatabasePromise = null;
+function mediaDatabase() {
+  if(!mediaDatabasePromise) {
+    mediaDatabasePromise = new Promise((resolve,reject)=>{
+      if(!window.indexedDB) { reject(new Error("IndexedDB недоступна")); return; }
+      const request=indexedDB.open("venus_ai_attachments_v1",1);
+      request.onupgradeneeded=()=>{
+        if(!request.result.objectStoreNames.contains("files"))
+          request.result.createObjectStore("files");
+      };
+      request.onsuccess=()=>resolve(request.result);
+      request.onerror=()=>reject(request.error||new Error("Не удалось открыть хранилище"));
+      request.onblocked=()=>reject(new Error("Хранилище вложений заблокировано другой вкладкой"));
+    });
+  }
+  return mediaDatabasePromise;
+}
 async function putMedia(id,value) {
+  const db=await mediaDatabase();
+  await new Promise((resolve,reject)=>{
+    const tx=db.transaction("files","readwrite");
+    tx.objectStore("files").put(value,id);
+    tx.oncomplete=resolve;
+    tx.onerror=()=>reject(tx.error||new Error("Не удалось сохранить вложение"));
+    tx.onabort=()=>reject(tx.error||new Error("Сохранение прервано"));
+  });
   mediaStore.set(id,value);
 }
-
 async function getMedia(id) {
-  return mediaStore.get(id) || null;
+  if(mediaStore.has(id))return mediaStore.get(id);
+  if(!id)return null;
+  try {
+    const db=await mediaDatabase();
+    const value=await new Promise((resolve,reject)=>{
+      const tx=db.transaction("files","readonly");
+      const request=tx.objectStore("files").get(id);
+      request.onsuccess=()=>resolve(request.result||null);
+      request.onerror=()=>reject(request.error||new Error("Не удалось прочитать вложение"));
+    });
+    if(value)mediaStore.set(id,value);
+    return value;
+  }catch(e){console.warn("Venus AI: attachment store",e);return null;}
 }
 
 function makeId() {
@@ -1578,7 +1613,11 @@ async function prepareFile(file) {
     media.text=await extractXlsx(file);
     record.kind="document";
   } else if(TEXT_EXTENSIONS.has(ext) || file.type.startsWith("text/")) {
-    media.text=(await file.text()).slice(0,MAX_EXTRACTED_CHARS);
+    const source=await file.text();
+    if(source.length>MAX_EXTRACTED_CHARS) {
+      throw new Error(`${file.name}: исходник слишком большой (${source.length} символов). Лимит ${MAX_EXTRACTED_CHARS}; уменьшите файл, чтобы код не потерялся.`);
+    }
+    media.text=source;
     record.kind="document";
   } else {
     throw new Error(`${file.name}: этот тип файла пока не поддерживается.`);
@@ -1990,13 +2029,15 @@ function mergeCodeContinuation(previous,continued) {
 function shouldCreateFiles(prompt,chat) {
   if(manualCodeMode) return true;
   const t=String(prompt||"").toLowerCase();
-  const make=/(?:напиши|сделай|создай|сгенерируй|разработай|собери|реализуй|перепиши|переделай|добавь|исправь|почини|обнови|дай|скинь|отправь|построй|верстай|сверстай|хочу|нужен|нужна)/i;
+  const make=/(?:напиши|сделай|создай|сгенерируй|разработай|собери|реализуй|перепиши|переделай|добавь|исправь|почини|обнови|улучши|улучшить|доработай|оптимизируй|дай|скинь|отправь|построй|верстай|сверстай|хочу|нужен|нужна)/i;
   const target=/(?:код|скрипт|программ|приложен|сайт|страниц|бота?\b|игру|проект|html|css|javascript|typescript|python|питон|pygame|lua|react|node|api|json|файл|artifact|артефакт)/i;
   const explicit=/(?:кодом|полный код|файл с кодом|готовый файл|исходники|весь код)/i;
   if(explicit.test(t)) return true;
   if(make.test(t) && target.test(t)) return true;
-  const wasCode=chat?.messages?.slice(-3).some(m=>m.role==="assistant"&&splitCodeArtifacts(m.content).blocks.length>0);
-  return !!(wasCode && /(?:измен|добав|исправ|перепиш|передел|обнов|сделай так)/i.test(t));
+  if(EDIT_WORDS.test(t) && sourceNamesInTask(t).length)return true;
+  const wasCode=chat?.messages?.slice(-6).some(m=>m.role==="assistant" &&
+    ((m.projectState?.files||[]).some(f=>f.content) || splitCodeArtifacts(m.content||"").blocks.length>0));
+  return !!(wasCode && /(?:измен|добав|исправ|перепиш|передел|обнов|улучш|доработ|оптимиз|сделай так)/i.test(t));
 }
 
 function codeBuildHtml(stage,detail="") {
@@ -2079,6 +2120,123 @@ const MAX_PROJECT_FILES = 10;
 const MAX_FILE_ROUNDS = 5;
 const MAX_PROJECT_REQUESTS = 12;
 const PROJECT_MESSAGE_BUDGET = 30000;
+
+/* Read original code from the latest attachment or from completed chat artifacts.
+ * Latest source takes priority; NEVER substitute Venus AI's own index.html. */
+const EDIT_WORDS = /(?:улучш|доработ|исправ|измени|изменить|передел|перепиш|обнов|оптимиз|почини|анимаци|редактир|добавь)/i;
+const SOURCE_EXT = /\.(?:html?|css|js|mjs|jsx|ts|tsx|py|lua|json|java|c|cpp|cs|go|rs|php|vue|svelte|md|sql|sh|xml|yaml|yml)$/i;
+function sourceNamesInTask(task) {
+  return [...String(task||"").matchAll(/(?:[\w.-]+\/)*[\w.-]+\.(?:html?|css|js|mjs|jsx|ts|tsx|py|lua|json|java|c|cpp|cs|go|rs|php|vue|svelte|md|sql|sh|xml|yaml|yml)/gi)]
+    .map(m=>safeCodeFilename(m[0]).toLowerCase());
+}
+function editingExistingCode(task) {
+  return EDIT_WORDS.test(String(task||""));
+}
+async function sourceFilesFromHistory(chat, userIndex, task) {
+  const result=new Map();
+  const names=sourceNamesInTask(task);
+  const matchesName=(name)=>{
+    if(!names.length)return true;
+    const key=name.toLowerCase();
+    return names.some(n=>n===key || n.split("/").pop()===key.split("/").pop());
+  };
+  const add=(name,content)=>{
+    const safe=safeCodeFilename(name);
+    if(!safe || !SOURCE_EXT.test(safe) || typeof content!=="string" || !content.trim())return;
+    if(content.length>MAX_EXTRACTED_CHARS)return;
+    if(!result.has(safe.toLowerCase()))result.set(safe.toLowerCase(),{name:safe,content});
+  };
+  // Explicit source on the current turn takes precedence over historical artifacts.
+  // Without a named target, do not mix unrelated projects from different turns.
+  let newestSourceTurn=-1;
+  for(let i=userIndex;i>=0;i--) {
+    if(!names.length && newestSourceTurn>=0 && i<newestSourceTurn)break;
+    const previousCount=result.size;
+    const message=chat.messages[i];
+    if(message.role==="user") {
+      for(const item of message.attachments||[]) {
+        if(!matchesName(item.name||""))continue;
+        const stored=await getMedia(item.mediaId);
+        if(typeof stored?.text==="string")add(item.name,stored.text);
+      }
+    }
+    if(message.role==="assistant") {
+      for(const file of message.projectState?.files||[]) {
+        if(matchesName(file.name))add(file.name,file.content);
+      }
+      if(typeof message.content==="string") {
+        const code=splitCodeArtifacts(message.content);
+        for(const block of code.blocks||[]) {
+          if(!block.complete)continue;
+          const name=filenameForCodeBlock(block);
+          if(matchesName(name))add(name,block.c);
+        }
+      }
+    }
+    if(!names.length && result.size>previousCount && newestSourceTurn<0)newestSourceTurn=i;
+    if(result.size>=MAX_PROJECT_FILES)break;
+  }
+  // If the user asked for a named file and it exists, avoid irrelevant older code.
+  if(names.length) {
+    const filtered=new Map([...result].filter(([key])=>matchesName(key)));
+    return filtered;
+  }
+  return result;
+}
+function originalForFile(state,name) {
+  const key=String(name||"").toLowerCase();
+  const sources=state._originalSources;
+  if(!sources)return "";
+  if(sources.has(key))return sources.get(key).content;
+  const leaf=key.split("/").pop();
+  const candidates=[...sources.values()].filter(f=>f.name.toLowerCase().split("/").pop()===leaf);
+  return candidates.length===1?candidates[0].content:"";
+}
+function applySourceEdits(source,raw) {
+  let value=String(raw||"").trim().replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/i,"");
+  const a=value.indexOf("{"),b=value.lastIndexOf("}");
+  if(a>=0&&b>a)value=value.slice(a,b+1);
+  let parsed;
+  try {parsed=JSON.parse(value);}catch {throw new Error("Модель прислала некорректный JSON изменений");}
+  if(!Array.isArray(parsed.edits) || !parsed.edits.length || parsed.edits.length>24)
+    throw new Error("Модель не вернула точные изменения исходного файла");
+  let output=source;
+  for(const edit of parsed.edits) {
+    if(typeof edit.search!=="string" || !edit.search || typeof edit.replace!=="string")
+      throw new Error("Неправильная операция редактирования");
+    const where=output.indexOf(edit.search);
+    if(where===-1)throw new Error("Модель не нашла участок исходного кода для изменения");
+    if(output.indexOf(edit.search,where+edit.search.length)!==-1)
+      throw new Error("Неоднозначный участок кода: модель должна указать больше окружающих строк");
+    output=output.slice(0,where)+edit.replace+output.slice(where+edit.search.length);
+  }
+  if(output===source)throw new Error("Модель не изменила исходный файл");
+  return output;
+}
+async function improveExistingFile(state,file,source,messages,headers,signal,progress) {
+  const instruction=`ЗАДАЧА: ${state.task}\nФайл: ${file.name}.\nНиже предоставлено ПОЛНОЕ содержимое настоящего исходного файла. НЕ говори, что файл отсутствует.\nСохрани все рабочие функции и дизайн. Сделай требуемые улучшения точечно.\nОтвет ТОЛЬКО валидный JSON без Markdown: {"edits":[{"search":"точный уникальный существующий фрагмент","replace":"полная замена этого фрагмента"}]}.\nКаждое search должно дословно встречаться в исходнике ровно один раз. Не переписывай целиком файл и не используй заглушки. Если нужно изменить несколько мест, выдай несколько операций.\n----- НАЧАЛО ФАЙЛА ${file.name} -----\n${source}\n----- КОНЕЦ ФАЙЛА -----`;
+  const context=[...projectContext(messages).filter(m=>m.role==="system"),{role:"user",content:instruction}];
+  let lastError=null;
+  for(let attempt=0;attempt<2;attempt++) {
+    if(signal.aborted)throw new DOMException("Отменено","AbortError");
+    progress(1,`Редактирую исходный ${file.name} · точные изменения (${attempt+1}/2)`);
+    try {
+      const response=await requestVenusOnce(context,state.model,headers,signal,attempt?4096:8192);
+      const updated=applySourceEdits(source,response.text);
+      const problem=validateProjectFile({name:file.name,content:updated});
+      if(problem)throw new Error(`${file.name}: ${problem}`);
+      file.content=updated;
+      file.complete=true;
+      file.patched=true;
+      file.generatedTokens=estimateOutputTokens(response.text);
+      return true;
+    }catch(e) {
+      if(signal.aborted || [400,401,403,413].includes(e.status))throw e;
+      lastError=e;
+    }
+  }
+  throw lastError || new Error("Не удалось улучшить исходный файл");
+}
 
 function fileLanguage(filename) {
   const ext=fileExtension(filename).toLowerCase();
@@ -2196,7 +2354,7 @@ function mergeFileFragment(previous,next) {
   return previous+next;
 }
 function projectTokenCount(state) {
-  return (state.files||[]).reduce((sum,file)=>sum+estimateOutputTokens(file.content),0);
+  return (state.files||[]).reduce((sum,file)=>sum+(file.patched ? (file.generatedTokens||0) : estimateOutputTokens(file.content)),0);
 }
 function projectLineCount(state) {
   return (state.files||[]).reduce((sum,file)=>sum+(file.content?file.content.split(/\r?\n/).length:0),0);
@@ -2215,7 +2373,14 @@ function fileInstruction(state,file) {
   Используй рабочие алгоритмы, а не фиктивные интерфейсы. Не заявляй о запуске тестов.
   Когда файл ПОЛНОСТЬЮ закончен, добавь отдельной строкой точный маркер ${PROJECT_END}.
   Если не помещается, остановись на границе строки без маркера: продолжение будет запрошено.`;
-  if(!file.content)return requirements;
+  const original=originalForFile(state,file.name);
+  if(!file.content && original) {
+    return requirements+`
+ПОЛНЫЙ ИСХОДНЫЙ ФАЙЛ ${file.name} (сохрани существующий функционал):
+${original}
+КОНЕЦ ИСХОДНОГО ФАЙЛА.`;
+  }
+  if(!file.content)return requirements+"\nЕсли исходник отсутствует, создай самостоятельную реализацию по требованиям; не говори, что файл был приложен.";
   return `Продолжи ТОЛЬКО файл ${file.name} точно после уже написанного кода.
   Не повторяй предыдущие строки, не открывай новый Markdown-блок, не начинай файл заново.
   Последние строки готового кода (это КОНТЕКСТ, не повторяй их):
@@ -2304,6 +2469,14 @@ async function ensureProjectManifest(state,messages,headers,signal,progress) {
     console.warn("Venus AI: project plan skipped",e);
   }
   state.files=normalizeProjectManifest(raw,state.task);
+  if(editingExistingCode(state.task) && state._originalSources?.size) {
+    const requested=sourceNamesInTask(state.task);
+    const sourceNames=[...state._originalSources.values()]
+      .filter(f=>!requested.length || requested.some(n=>n===f.name.toLowerCase() || n.split("/").pop()===f.name.toLowerCase().split("/").pop()))
+      .map(f=>f.name);
+    const originalFiles=sourceNames.map(name=>({name,purpose:"Изменить существующий файл, сохранив текущий функционал",content:"",complete:false,rounds:0,restarts:0}));
+    if(originalFiles.length)state.files=[...originalFiles,...state.files.filter(f=>!originalFiles.some(o=>o.name.toLowerCase()===f.name.toLowerCase()))].slice(0,MAX_PROJECT_FILES);
+  }
   progress(1,`Определены файлы проекта: ${state.files.map(f=>f.name).join(", ")}`);
 }
 async function buildRealProject(chat,message,headers,signal,progress) {
@@ -2311,12 +2484,44 @@ async function buildRealProject(chat,message,headers,signal,progress) {
   const initial=chat.messages.slice(0,chat.messages.indexOf(message));
   // Construct model input from the original conversation, not from partial artifacts.
   const base=await buildApiMessages({messages:initial});
-  await ensureProjectManifest(state,base,headers,signal,progress);
+  const lastUserIndex=initial.length-1;
+  const sources=await sourceFilesFromHistory(chat,lastUserIndex,state.task);
+  // Non-enumerable: don't duplicate 150 KB of source in localStorage on every save.
+  Object.defineProperty(state,"_originalSources",{value:sources,configurable:true,writable:true,enumerable:false});
+  // No speculative file-list request for a named source that we already have.
+  const wanted=sourceNamesInTask(state.task);
+  if(editingExistingCode(state.task) && sources.size && (wanted.length || sources.size===1) && !state.files?.length) {
+    state.files=[...sources.values()].slice(0,MAX_PROJECT_FILES).map(f=>({
+      name:f.name,purpose:"Доработать существующий исходный файл",content:"",complete:false,rounds:0,restarts:0
+    }));
+    progress(1,`Исходник найден: ${state.files.map(f=>f.name).join(", ")}`);
+  } else {
+    await ensureProjectManifest(state,base,headers,signal,progress);
+  }
+  if(editingExistingCode(state.task) && !sources.size) {
+    progress(1,"Исходника в этом чате нет — создаю новую реализацию по описанию, а не подменяю существующий файл.");
+  }
   message.truncated=true;
   let attempts=0;
   for(let index=0;index<state.files.length;index++) {
     const file=state.files[index];
     if(file.complete)continue;
+    const source=editingExistingCode(state.task) ? originalForFile(state,file.name) : "";
+    if(source && !file.content) {
+      try {
+        await improveExistingFile(state,file,source,base,headers,signal,progress);
+        message.content=buildProjectMarkdown(state);
+        message.truncated=state.files.some(f=>!f.complete);
+        saveChats();renderLineUsage();
+        if(file.complete)continue;
+      }catch(e) {
+        if(signal.aborted || [401,403].includes(e.status))throw e;
+        state.lastError=`${file.name}: ${e.message||e}`;
+        message.resumeError=state.lastError;
+        // Keep original source untouched: never turn a bad patch into a broken replacement.
+        break;
+      }
+    }
     let stalled=0;
     for(let round=0;round<MAX_FILE_ROUNDS && attempts<MAX_PROJECT_REQUESTS;round++) {
       if(signal.aborted)throw new DOMException("Отменено","AbortError");
