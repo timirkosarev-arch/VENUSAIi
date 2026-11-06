@@ -1429,10 +1429,10 @@ function msgHTML(m,index) {
       <div class="av"></div>
       <div class="bub">
         ${m.codeBuild && (m.truncated || m.resuming)
-          ? `<div class="code-draft-private"><strong>${m.resuming?"Продолжаю создание файлов":m.content?"Черновик кода сохранён":"Генерация не завершилась"}</strong><small>Код пока скрыт · ≈${estimateOutputTokens(m.content||"").toLocaleString("ru-RU")} токенов · ${countCodeLines(m.content||"").toLocaleString("ru-RU")} строк. ${m.resuming?"Собираю полный файл.":"Для завершения нажмите «Продолжить генерацию»."}</small></div>`
+          ? `<div class="code-draft-private"><strong>${m.resuming?"Создание исходных файлов":m.content?"Генерация частично выполнена":"Не удалось получить код"}</strong><small>${m.content?`Код скрыт · ≈${estimateOutputTokens(m.content).toLocaleString("ru-RU")} токенов · ${countCodeLines(m.content).toLocaleString("ru-RU")} строк. `:"Модель пока не прислала ни одной строки кода. "}${m.resuming?"Получаю настоящий ответ API.":"Повторить можно вручную."}</small></div>`
           : md(m.content || "", !!m.truncated && !m.codeBuild)}
         ${m.codeBuild && m.resuming ? '<div class="code-build-result">Дополняю код и проверяю результат…</div>' : ''}
-        ${m.truncated && m.codeBuild && !m.resuming ? `<div class="code-build-result">${m.tokenBudgetHit ? "Достигнут предел 30 000 токенов для одного проекта. Можно создать более компактную версию." : "Код сохранён. Можно продолжить генерацию с места остановки."}${m.resumeError ? " " + esc(m.resumeError) : ""}</div>` : ''}
+        ${m.truncated && m.codeBuild && !m.resuming ? `<div class="code-build-result">${m.tokenBudgetHit ? "Достигнут предел 30 000 токенов для одного проекта." : m.content ? "Полученные строки сохранены." : "Готовых файлов пока нет."}${m.resumeError ? " Причина: " + esc(m.resumeError) : ""}</div>` : ''}
         ${m.truncated && !m.codeBuild ? '<div class="code-build-result">Ответ прервался. Попробуйте повторить запрос.</div>' : ''}
         ${m.codeBuild && m.projectState?.finished && !m.truncated && inspectCodeFiles(m.content).files.length ? '<div class="code-build-result">Файлы сформированы. Откройте артефакт или скачайте проект. Проверка запуска выполняется отдельно.</div>' : ''}
         <div class="message-actions">
@@ -2150,11 +2150,26 @@ function stripCodeEnvelope(raw) {
   }
   return text;
 }
-function parseFileFragment(raw) {
-  const mark=String(raw||"").indexOf(PROJECT_END);
-  let text=mark>=0 ? raw.slice(0,mark) : raw;
-  text=stripCodeEnvelope(text);
-  return {text,complete:mark>=0};
+function parseFileFragment(raw,filename="",finishReason=null,interrupted=false) {
+  const original=String(raw||"").replace(/\r\n?/g,"\n");
+  const mark=original.indexOf(PROJECT_END);
+  let text=mark>=0 ? original.slice(0,mark) : original;
+  // Allow models that respond using the normal "File: ..." Markdown format.
+  const markdown=text.match(/(?:^|\n)```[^\n]*\n([\s\S]*?)\n```(?:\s|$)/);
+  if(markdown)text=markdown[1];
+  else {
+    text=text.replace(/^\s*(?:Файл|File)\s*:\s*`?[^\n`]+`?\s*\n/i,"");
+    text=stripCodeEnvelope(text);
+  }
+  text=text.replace(/\n?\s*<<<VENUS_FILE_END>>>\s*$/g,"");
+  // Many supported models finish cleanly but omit a custom delimiter.
+  // Only trust a natural end, never a length limit, interrupted stream or empty output.
+  const naturalEnd=["stop","end_turn","completed"].includes(String(finishReason||"").toLowerCase());
+  const valid=text.trim().length>=35 && !validateProjectFile({name:filename,content:text});
+  const isHtml=/\.html?$/i.test(filename);
+  const htmlClosed=!isHtml || !/<html(?:\s|>)/i.test(text) || /<\/html\s*>/i.test(text);
+  const complete=mark>=0 || (naturalEnd && !interrupted && valid && htmlClosed);
+  return {text,complete};
 }
 function validateProjectFile(file) {
   if(!file.content.trim())return "Файл пустой";
@@ -2209,58 +2224,68 @@ function fileInstruction(state,file) {
   Выдай только следующую часть исходного кода. Как только файл полностью закончен, добавь отдельной строкой ${PROJECT_END}.`;
 }
 async function requestFilePart(state,file,messages,headers,signal,notify) {
-  const prompt=fileInstruction(state,file);
-  const context=[...projectContext(messages),{role:"user",content:prompt}];
-  const attempts=[2048,1024];
+  const remaining=MAX_TOTAL_CODE_TOKENS-projectTokenCount(state);
+  if(remaining<256)throw new Error("Исчерпан бюджет 30 000 токенов кода.");
+  const originalContext=[...projectContext(messages),
+    {role:"user",content:fileInstruction(state,file)}];
+  // If a long instruction is rejected or the model spends its small output
+  // budget on internal reasoning, use a short coding prompt with more tokens.
+  const simplePrompt=`Задача: ${state.task}\nНапиши полный исходный код файла ${file.name}.
+  Никаких заглушек, объяснений и Markdown. Сразу начни с кода.
+  ${file.content ? `Продолжай строго с этого места. Уже написано, не повторяй:\n${file.content.slice(-4500)}` : ""}
+  Если файл завершён, закончи отдельной строкой ${PROJECT_END}.`;
+  const simpleContext=[...projectContext(messages).filter(m=>m.role==="system").slice(0,1),
+    {role:"user",content:simplePrompt}];
+  const attempts=[
+    {tokens:Math.min(8192,remaining),stream:true,context:originalContext},
+    {tokens:Math.min(8192,remaining),stream:false,context:simpleContext},
+    {tokens:Math.min(4096,remaining),stream:true,context:simpleContext}
+  ];
   let lastError=null;
   for(let attempt=0;attempt<attempts.length;attempt++) {
     if(signal.aborted)throw new DOMException("Отменено","AbortError");
-    const remaining=Math.max(256,MAX_TOTAL_CODE_TOKENS-projectTokenCount(state));
-    const size=Math.min(attempts[attempt],remaining);
+    const option=attempts[attempt];
     let response;
     try {
+      notify?.("",`Запрашиваю содержимое ${file.name} (${attempt+1}/${attempts.length})…`);
       response=await fetch(API_URL,{
         method:"POST",headers,signal,
-        body:JSON.stringify({model:state.model,messages:context,stream:attempt===0,max_tokens:size})
+        body:JSON.stringify({model:state.model,messages:option.context,
+          stream:option.stream,max_tokens:option.tokens})
       });
       if(!response.ok) {
         const raw=await response.text().catch(()=>"");
         let reason=raw;
-        try {const data=JSON.parse(raw);reason=data.error?.message||data.error||raw;}catch{}
-        const e=new Error(`API ${response.status}: ${String(reason).slice(0,300)}`);
+        try {const data=JSON.parse(raw);reason=data.error?.message||data.error||data.message||raw;}catch{}
+        const e=new Error(`API ${response.status}: ${String(reason).slice(0,400)}`);
         e.status=response.status;
         throw e;
       }
       let text="",metadata;
       beginLiveTokenPreview();
       try {
-        metadata=await readVenusResponse(response,fragment=>{
-          text+=fragment;
+        metadata=await readVenusResponse(response,part=>{
+          text+=part;
           updateLiveTokenPreview(text);
           notify?.(text);
         });
       } catch(e) {
         if(!text)throw e;
         metadata={finishReason:"interrupted",interrupted:true,usage:null};
-      } finally {
-        endLiveTokenPreview();
-      }
-      // One API request produces exactly one usage accounting record.
-      addTokenUsage(metadata.usage,context,text);
+      } finally {endLiveTokenPreview();}
+      addTokenUsage(metadata.usage,option.context,text);
       if(text.trim())return {text,reason:metadata.finishReason,interrupted:metadata.interrupted};
-      lastError=new Error("Модель не прислала текст.");
-      // A successful but empty response should not start an endless chain.
-      break;
+      const e=new Error(`AnyModel вернул пустое содержимое файла ${file.name}`+
+        `${metadata.finishReason?` (finish_reason: ${metadata.finishReason})`:""}. Попытка с другим форматом запроса.`);
+      e.status=502;
+      lastError=e;
     } catch(e) {
       endLiveTokenPreview();
       if(signal.aborted || [400,401,403,413].includes(e.status))throw e;
       lastError=e;
     }
-    if(attempt+1<attempts.length) {
-      notify?.("",`Запрос не удался. Последняя попытка (${attempt+2}/${attempts.length})`);
-    }
   }
-  throw lastError||new Error("Модель не вернула код.");
+  throw lastError || new Error("Провайдер не вернул исходный код.");
 }
 async function ensureProjectManifest(state,messages,headers,signal,progress) {
   if(state.files?.length)return;
@@ -2316,7 +2341,9 @@ async function buildRealProject(chat,message,headers,signal,progress) {
       }
       attempts++;
       state.requests=(state.requests||0)+1;
-      const parsed=parseFileFragment(fragment.text);
+      const parsed=parseFileFragment(fragment.text,file.name,fragment.reason,fragment.interrupted);
+      state.lastError="";
+      message.resumeError="";
       file.content=mergeFileFragment(before,parsed.text);
       file.rounds=(file.rounds||0)+1;
       if(projectTokenCount(state)>MAX_TOTAL_CODE_TOKENS) {
@@ -2403,7 +2430,9 @@ async function send(text,attachmentsOverride=null) {
       am.projectState={task:text,model,files:[],requests:0,finished:false,lastError:""};
       c.messages.push(am);saveChats();
       await buildRealProject(c,am,headers,ctrl.signal,progress);
-      if(!am.content.trim())throw new Error("Модель не создала ни одного файла. Попробуй режим High или Pro High.");
+      if(!am.content.trim())throw new Error(
+        am.projectState.lastError || "AnyModel не прислал содержимое файла. Проверь доступность выбранной модели и настройки API_KEY."
+      );
     } else {
       const messages=await buildApiMessages(c);
       const response=await fetch(API_URL,{
