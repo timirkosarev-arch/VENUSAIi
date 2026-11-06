@@ -1434,7 +1434,7 @@ function msgHTML(m,index) {
         ${m.codeBuild && m.resuming ? '<div class="code-build-result">Дополняю код и проверяю результат…</div>' : ''}
         ${m.truncated && m.codeBuild && !m.resuming ? `<div class="code-build-result">${m.tokenBudgetHit ? "Достигнут предел 30 000 токенов для одного проекта. Можно создать более компактную версию." : "Код сохранён. Можно продолжить генерацию с места остановки."}${m.resumeError ? " " + esc(m.resumeError) : ""}</div>` : ''}
         ${m.truncated && !m.codeBuild ? '<div class="code-build-result">Ответ прервался. Попробуйте повторить запрос.</div>' : ''}
-        ${m.codeBuild && !m.truncated && inspectCodeFiles(m.content).files.length ? '<div class="code-build-result">Файлы сформированы. Откройте артефакт или скачайте проект. Проверка запуска выполняется отдельно.</div>' : ''}
+        ${m.codeBuild && m.projectState?.finished && !m.truncated && inspectCodeFiles(m.content).files.length ? '<div class="code-build-result">Файлы сформированы. Откройте артефакт или скачайте проект. Проверка запуска выполняется отдельно.</div>' : ''}
         <div class="message-actions">
           ${m.codeBuild && m.truncated && !m.resuming ? `<button data-resume-code data-index="${index}" type="button">${m.tokenBudgetHit ? "Сделать компактную версию" : "Продолжить генерацию"}</button>` : ''}
           ${m.codeBuild && !m.truncated && inspectCodeFiles(m.content).files.length ? `<button data-download-project data-index="${index}" type="button">${inspectCodeFiles(m.content).files.length===1?"Скачать файл":"Скачать проект ZIP"}</button>` : ''}
@@ -2076,8 +2076,8 @@ function finalCodeInstruction(plan) {
  * until it has been returned by the model. No simulated token or line growth. */
 const PROJECT_END = "<<<VENUS_FILE_END>>>";
 const MAX_PROJECT_FILES = 10;
-const MAX_FILE_ROUNDS = 12;
-const MAX_PROJECT_REQUESTS = 40;
+const MAX_FILE_ROUNDS = 5;
+const MAX_PROJECT_REQUESTS = 12;
 const PROJECT_MESSAGE_BUDGET = 30000;
 
 function fileLanguage(filename) {
@@ -2211,7 +2211,7 @@ function fileInstruction(state,file) {
 async function requestFilePart(state,file,messages,headers,signal,notify) {
   const prompt=fileInstruction(state,file);
   const context=[...projectContext(messages),{role:"user",content:prompt}];
-  const attempts=[4096,2048,1024];
+  const attempts=[2048,1024];
   let lastError=null;
   for(let attempt=0;attempt<attempts.length;attempt++) {
     if(signal.aborted)throw new DOMException("Отменено","AbortError");
@@ -2249,12 +2249,16 @@ async function requestFilePart(state,file,messages,headers,signal,notify) {
       addTokenUsage(metadata.usage,context,text);
       if(text.trim())return {text,reason:metadata.finishReason,interrupted:metadata.interrupted};
       lastError=new Error("Модель не прислала текст.");
+      // A successful but empty response should not start an endless chain.
+      break;
     } catch(e) {
       endLiveTokenPreview();
       if(signal.aborted || [400,401,403,413].includes(e.status))throw e;
       lastError=e;
     }
-    notify?.("",`Повторная попытка ${attempt+2} из ${attempts.length} — меньшая часть`);
+    if(attempt+1<attempts.length) {
+      notify?.("",`Запрос не удался. Последняя попытка (${attempt+2}/${attempts.length})`);
+    }
   }
   throw lastError||new Error("Модель не вернула код.");
 }
@@ -2307,6 +2311,7 @@ async function buildRealProject(chat,message,headers,signal,progress) {
       } catch(e) {
         if(signal.aborted || [401,403].includes(e.status))throw e;
         state.lastError=e.message||"Ошибка запроса";
+        message.resumeError="Генерация остановлена после неудачных попыток: "+state.lastError;
         break;
       }
       attempts++;
@@ -2351,6 +2356,9 @@ async function buildRealProject(chat,message,headers,signal,progress) {
   message.content=buildProjectMarkdown(state);
   const finished=state.files.length>0 && state.files.every(f=>f.complete);
   message.truncated=!finished;
+  if(!finished && !message.resumeError) {
+    message.resumeError=state.lastError || "Генерация остановлена: достигнут лимит попыток. Нажмите «Продолжить генерацию» вручную.";
+  }
   message.resuming=false;
   state.finished=finished;
   saveChats();
