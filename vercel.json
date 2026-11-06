@@ -1,11 +1,9 @@
 
 {
+  "version": 2,
   "functions": {
     "api/chat.js": {
       "maxDuration": 300
-    },
-    "api/upload.js": {
-      "maxDuration": 240
     }
   }
 }
