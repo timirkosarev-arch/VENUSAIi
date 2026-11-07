@@ -3,64 +3,105 @@ import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 
 const API_URL = "https://tooken.club/v1/chat/completions";
-const MODEL = "deepseek-v4.1-flash-1017";
+const MODEL_DEEPSEEK = "deepseek-v4.1-flash-1017";
 
-const VENUS_SYSTEM_PROMPT = `
-Ты Venus — технический специалист, инженер и разработчик Venus AI.
+const PROMPT_URL =
+  "https://raw.githubusercontent.com/timirkosarev-arch/VENUSAIi/main/promt.txt";
 
-## Стиль общения
+const PROMPT_CACHE_MS = 60000;
+const PROMPT_MAX_CHARS = 60000;
 
-- Общайся на русском, если пользователь не попросил другой язык.
-- Пиши прямо, понятно и без лишних вступлений.
-- Используй дружелюбный, уверенный стиль общения на равных.
-- Для коротких вопросов давай короткие ответы.
-- Для сложных задач предоставляй законченные решения.
-- Учитывай опечатки, сокращения и неправильную раскладку клавиатуры.
-- Не задавай лишних вопросов, если задача понятна.
-- Не выдумывай факты, результаты тестирования или содержимое файлов.
-- По умолчанию можешь начинать ответ с «Venus ·».
+let promptCache = {
+  text: "",
+  expiresAt: 0,
+  pending: null
+};
 
-## Программирование
+async function loadSystemPrompt() {
+  if (
+    promptCache.text &&
+    Date.now() < promptCache.expiresAt
+  ) {
+    return promptCache.text;
+  }
 
-- Если пользователь просит код, предоставляй рабочую реализацию.
-- Не используй фиктивные заглушки, TODO и пропущенные части.
-- Для одного файла предоставляй полный код.
-- Для нескольких файлов показывай структуру проекта и содержимое файлов.
-- Используй блоки Markdown с названием языка.
-- Если пользователь просит только код, отвечай только кодом.
-- Сохраняй существующий интерфейс и функциональность при доработке проектов.
-- Учитывай предоставленные исходные файлы.
-- Для веб-приложений обеспечивай адаптацию под телефон и плавные анимации.
-- Проверяй согласованность импортов, функций, переменных и обработчиков.
-- Не вставляй секретные API-ключи в публичный код.
-- Не называй незавершённый проект готовым.
-- Если код большой, предоставляй законченные файлы по частям.
+  if (promptCache.pending) {
+    return promptCache.pending;
+  }
 
-## Работа с проектами
+  const loading = (async () => {
+    let response;
 
-- Используй исходный код, если он предоставлен.
-- Не утверждай, что видел файл, которого нет в контексте.
-- Исправляй причину ошибок, а не только их сообщения.
-- Не удаляй рабочие функции без необходимости.
-- Сохраняй историю решений внутри текущего диалога.
-- Если пользователь пишет «продолжи», продолжай предыдущую работу.
-- Если пользователь пишет «desk», подготовь новую реализацию по контексту.
+    try {
+      const url =
+        PROMPT_URL +
+        "?refresh=" +
+        Math.floor(Date.now() / PROMPT_CACHE_MS);
 
-## Точность и безопасность
+      response = await fetch(url, {
+        headers: {
+          Accept: "text/plain"
+        },
+        cache: "no-store",
+        signal: AbortSignal.timeout(10000)
+      });
+    } catch (e) {
+      throw createError(
+        502,
+        "Не удалось загрузить promt.txt с GitHub: " +
+          e.message
+      );
+    }
 
-- Давай конкретные и проверяемые решения.
-- Не утверждай, что выполнил тестирование, если его не было.
-- Помогай с разработкой, отладкой, защитой и исследованием систем.
-- Соблюдай применимые правила безопасности.
-- Не раскрывай чужие секреты и персональные данные.
+    if (response.status === 404) {
+      throw createError(
+        500,
+        "Файл promt.txt не найден в корне репозитория VENUSAIi. " +
+          "Добавь promt.txt рядом с index.html в ветку main."
+      );
+    }
 
-## Формат ответа
+    if (!response.ok) {
+      throw createError(
+        502,
+        "Ошибка загрузки promt.txt: HTTP " +
+          response.status
+      );
+    }
 
-- Минимум вступления.
-- Основной результат сразу.
-- Код в обычных блоках Markdown.
-- Пояснения только когда они необходимы.
-`;
+    const prompt = (await response.text())
+      .replace(/^\uFEFF/, "")
+      .trim();
+
+    if (!prompt) {
+      throw createError(
+        500,
+        "Системный промпт в promt.txt пуст."
+      );
+    }
+
+    if (prompt.length > PROMPT_MAX_CHARS) {
+      throw createError(
+        413,
+        "Файл promt.txt превышает 60000 символов."
+      );
+    }
+
+    promptCache.text = prompt;
+    promptCache.expiresAt =
+      Date.now() + PROMPT_CACHE_MS;
+
+    return prompt;
+  })();
+
+  promptCache.pending = loading;
+
+  try {
+    return await loading;
+  } finally {
+    promptCache.pending = null;
+  }
+}
 
 const MAX_REQUEST_TOKENS = 30000;
 const MAX_MESSAGES = 24;
@@ -82,7 +123,24 @@ const IMAGE_MIME = new Set([
 ]);
 
 function createError(status, message) {
-  return Object.assign(new Error(message), { status });
+  return Object.assign(new Error(message), {
+    status
+  });
+}
+
+function configuredKeys() {
+  return [
+    process.env.TOOKEN_API_KEY ||
+      process.env.API_KEY,
+
+    process.env.TOOKEN_API_KEY_2 ||
+      process.env.API_KEY_2
+  ]
+    .map(key => String(key || "").trim())
+    .filter(
+      (key, index, array) =>
+        key && array.indexOf(key) === index
+    );
 }
 
 function firebaseApp() {
@@ -90,13 +148,17 @@ function firebaseApp() {
     app => app.name === "venus-ai-api"
   );
 
-  if (existing) return existing;
+  if (existing) {
+    return existing;
+  }
 
   let account;
 
   try {
     account = process.env.FIREBASE_SERVICE_ACCOUNT_JSON
-      ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON)
+      ? JSON.parse(
+          process.env.FIREBASE_SERVICE_ACCOUNT_JSON
+        )
       : {
           project_id: process.env.FIREBASE_PROJECT_ID,
           client_email: process.env.FIREBASE_CLIENT_EMAIL,
@@ -120,10 +182,15 @@ function firebaseApp() {
     );
   }
 
-  account.private_key = account.private_key.replace(
-    /\\n/g,
-    "\n"
-  );
+  if (!process.env.FIREBASE_DATABASE_URL) {
+    throw createError(
+      500,
+      "FIREBASE_DATABASE_URL не настроен."
+    );
+  }
+
+  account.private_key =
+    account.private_key.replace(/\\n/g, "\n");
 
   return initializeApp(
     {
@@ -140,13 +207,15 @@ async function authenticate(req) {
   ).match(/^Bearer\s+(.+)$/i)?.[1];
 
   if (!bearer) {
-    throw createError(401, "Токен отсутствует.");
+    throw createError(
+      401,
+      "Токен авторизации отсутствует."
+    );
   }
 
   try {
-    return await getAuth(firebaseApp()).verifyIdToken(
-      bearer
-    );
+    return await getAuth(firebaseApp())
+      .verifyIdToken(bearer);
   } catch {
     throw createError(
       401,
@@ -156,6 +225,7 @@ async function authenticate(req) {
 }
 
 const guestHits = new Map();
+
 const GUEST_WINDOW_MS = 60 * 60 * 1000;
 const GUEST_REQUESTS_PER_HOUR = 30;
 
@@ -173,8 +243,10 @@ function enforceGuestLimit(req, res) {
   const now = Date.now();
 
   if (guestHits.size > 5000) {
-    for (const [key, value] of guestHits) {
-      if (now - value.start >= GUEST_WINDOW_MS) {
+    for (const [key, entry] of guestHits) {
+      if (
+        now - entry.start >= GUEST_WINDOW_MS
+      ) {
         guestHits.delete(key);
       }
     }
@@ -189,7 +261,10 @@ function enforceGuestLimit(req, res) {
   const entry =
     !previous ||
     now - previous.start >= GUEST_WINDOW_MS
-      ? { start: now, count: 0 }
+      ? {
+          start: now,
+          count: 0
+        }
       : previous;
 
   if (entry.count >= GUEST_REQUESTS_PER_HOUR) {
@@ -203,7 +278,10 @@ function enforceGuestLimit(req, res) {
       )
     );
 
-    res.setHeader("Retry-After", String(retry));
+    res.setHeader(
+      "Retry-After",
+      String(retry)
+    );
 
     throw createError(
       429,
@@ -255,7 +333,8 @@ async function convertImage(link, signal) {
         response.status
       )
     ) {
-      const next = response.headers.get("location");
+      const next =
+        response.headers.get("location");
 
       if (!next) {
         throw createError(
@@ -265,6 +344,7 @@ async function convertImage(link, signal) {
       }
 
       url = new URL(next, url);
+
       continue;
     }
 
@@ -285,7 +365,7 @@ async function convertImage(link, signal) {
     if (!IMAGE_MIME.has(type)) {
       throw createError(
         400,
-        "Тип фото не поддерживается."
+        "Тип изображения не поддерживается."
       );
     }
 
@@ -301,18 +381,25 @@ async function convertImage(link, signal) {
     }
 
     if (!response.body) {
-      throw createError(502, "Фото пустое.");
+      throw createError(
+        502,
+        "Изображение пустое."
+      );
     }
 
     const reader = response.body.getReader();
+
     const chunks = [];
     let size = 0;
 
     try {
-      while (true) {
-        const { done, value } = await reader.read();
+      for (;;) {
+        const { done, value } =
+          await reader.read();
 
-        if (done) break;
+        if (done) {
+          break;
+        }
 
         size += value.byteLength;
 
@@ -325,7 +412,9 @@ async function convertImage(link, signal) {
           );
         }
 
-        chunks.push(Buffer.from(value));
+        chunks.push(
+          Buffer.from(value)
+        );
       }
     } finally {
       reader.releaseLock();
@@ -334,13 +423,14 @@ async function convertImage(link, signal) {
     if (!size) {
       throw createError(
         400,
-        "Фото пустое."
+        "Изображение пустое."
       );
     }
 
     return (
       `data:${type};base64,` +
-      Buffer.concat(chunks).toString("base64")
+      Buffer.concat(chunks)
+        .toString("base64")
     );
   }
 
@@ -362,7 +452,9 @@ async function normalizeContent(content, signal) {
     return content;
   }
 
-  if (!Array.isArray(content)) return null;
+  if (!Array.isArray(content)) {
+    return null;
+  }
 
   const result = [];
 
@@ -382,9 +474,8 @@ async function normalizeContent(content, signal) {
         type: "text",
         text: part.text
       });
-    }
 
-    if (
+    } else if (
       part?.type === "image_url" &&
       typeof part.image_url?.url === "string"
     ) {
@@ -404,11 +495,15 @@ async function normalizeContent(content, signal) {
         ) {
           throw createError(
             400,
-            "Некорректное фото или превышен размер 5 МБ."
+            "Некорректное изображение или превышен размер 5 МБ."
           );
         }
+
       } else {
-        url = await convertImage(url, signal);
+        url = await convertImage(
+          url,
+          signal
+        );
       }
 
       result.push({
@@ -422,16 +517,6 @@ async function normalizeContent(content, signal) {
   }
 
   return result.length ? result : null;
-}
-
-function isQuotaFailure(status, detail) {
-  if (status === 402 || status === 429) {
-    return true;
-  }
-
-  return /(?:insufficient[_\s-]?(?:quota|balance|credit|credits|funds)|(?:quota|balance|credits?)[_\s-]?(?:exceeded|exhausted|depleted|used\s*up)|(?:out\s+of|no\s+more)[_\s-]?(?:tokens?|credits?|funds)|billing[_\s-]?(?:limit|exceeded)|(?:баланс|квота|кредит)[^\n]{0,45}(?:законч|исчерп|недостаточ))/i.test(
-    String(detail || "")
-  );
 }
 
 function tokenParamError(status, detail) {
@@ -457,13 +542,27 @@ async function upstreamError(response) {
       parsed.message ||
       raw
     ).slice(0, 600);
+
   } catch {
     return raw.slice(0, 600);
   }
 }
 
+function isQuotaFailure(status, detail) {
+  if (status === 402 || status === 429) {
+    return true;
+  }
+
+  return /(?:insufficient[_\s-]?(?:quota|balance|credit|credits|funds)|(?:quota|balance|credits?)[_\s-]?(?:exceeded|exhausted|depleted|used\s*up)|(?:out\s+of|no\s+more)[_\s-]?(?:tokens?|credits?|funds)|billing[_\s-]?(?:limit|exceeded)|(?:баланс|квота|кредит)[^\n]{0,45}(?:законч|исчерп|недостаточ))/i.test(
+    String(detail || "")
+  );
+}
+
 function upstreamErrorMessage(data) {
-  const item = data?.error ?? data?.message ?? data;
+  const item =
+    data?.error ??
+    data?.message ??
+    data;
 
   if (typeof item === "string") {
     return item.slice(0, 600);
@@ -484,6 +583,7 @@ function upstreamErrorMessage(data) {
 
 async function peekSse(response) {
   const reader = response.body.getReader();
+
   const pending = [];
   const decoder = new TextDecoder();
 
@@ -495,13 +595,17 @@ async function peekSse(response) {
 
     done = result.done;
 
-    if (done) break;
+    if (done) {
+      break;
+    }
 
     pending.push(result.value);
 
     prefix += decoder.decode(
       result.value,
-      { stream: true }
+      {
+        stream: true
+      }
     );
 
     if (/\r?\n\r?\n/.test(prefix)) {
@@ -516,16 +620,24 @@ async function peekSse(response) {
 
   const dataText = firstEvent
     .split(/\r?\n/)
-    .filter(line => line.startsWith("data:"))
-    .map(line => line.slice(5).trimStart())
+    .filter(
+      line => line.startsWith("data:")
+    )
+    .map(
+      line => line.slice(5).trimStart()
+    )
     .join("\n");
 
-  if (dataText && dataText !== "[DONE]") {
+  if (
+    dataText &&
+    dataText !== "[DONE]"
+  ) {
     try {
       const event = JSON.parse(dataText);
 
       if (event?.error) {
-        const reason = upstreamErrorMessage(event);
+        const reason =
+          upstreamErrorMessage(event);
 
         return {
           reader,
@@ -549,14 +661,33 @@ async function peekSse(response) {
 
 export default async function handler(req, res) {
   if (req.method === "GET") {
+    let promptLoaded = false;
+    let promptError = null;
+
+    try {
+      await loadSystemPrompt();
+      promptLoaded = true;
+    } catch (e) {
+      promptError = e.message;
+    }
+
     return res.status(200).json({
       ok: true,
-      version: "venus-user-prompt-v8"
+      version: "venus-github-promt-v12",
+      provider: "Tooken Club",
+      keyConfigured: configuredKeys().length > 0,
+      model: MODEL_DEEPSEEK,
+      promptFile: "promt.txt",
+      promptLoaded,
+      ...(promptError ? { promptError } : {})
     });
   }
 
   if (req.method !== "POST") {
-    res.setHeader("Allow", "GET, POST");
+    res.setHeader(
+      "Allow",
+      "GET, POST"
+    );
 
     return res.status(405).json({
       error: "Метод не поддерживается."
@@ -574,10 +705,10 @@ export default async function handler(req, res) {
   );
 
   try {
-    if (!process.env.API_KEY) {
+    if (!configuredKeys().length) {
       throw createError(
         500,
-        "API_KEY не настроен в Vercel."
+        "Ключ Tooken Club отсутствует. Настрой API_KEY или TOOKEN_API_KEY в Vercel."
       );
     }
 
@@ -597,8 +728,7 @@ export default async function handler(req, res) {
       );
     }
 
-    // Модель закреплена на сервере.
-    const model = MODEL;
+    const model = MODEL_DEEPSEEK;
 
     stage = "visitor_access";
 
@@ -607,7 +737,9 @@ export default async function handler(req, res) {
     ).trim();
 
     if (authorization) {
-      if (!/^Bearer\s+\S+$/i.test(authorization)) {
+      if (
+        !/^Bearer\s+\S+$/i.test(authorization)
+      ) {
         throw createError(
           401,
           "Неверный формат токена авторизации."
@@ -636,34 +768,29 @@ export default async function handler(req, res) {
       );
     }
 
+    stage = "system_prompt";
+
+    const systemPrompt =
+      await loadSystemPrompt();
+
     stage = "normalize_messages";
 
     const messages = [
       {
         role: "system",
-        content: VENUS_SYSTEM_PROMPT
+        content: systemPrompt
       }
     ];
-
-    let userStylePreferences = "";
 
     for (
       const message of body.messages.slice(-MAX_MESSAGES)
     ) {
+      // Промпт берётся только из репозитория.
       if (
-        !["system", "user", "assistant"].includes(
+        !["user", "assistant"].includes(
           message?.role
         )
       ) {
-        continue;
-      }
-
-      if (message.role === "system") {
-        if (typeof message.content === "string") {
-          userStylePreferences =
-            message.content.slice(0, 6000);
-        }
-
         continue;
       }
 
@@ -687,7 +814,9 @@ export default async function handler(req, res) {
     }
 
     if (
-      !messages.some(message => message.role === "user")
+      !messages.some(
+        message => message.role === "user"
+      )
     ) {
       throw createError(
         400,
@@ -695,20 +824,9 @@ export default async function handler(req, res) {
       );
     }
 
-    if (
-      userStylePreferences &&
-      userStylePreferences !== VENUS_SYSTEM_PROMPT
-    ) {
-      messages.splice(1, 0, {
-        role: "user",
-        content:
-          "Дополнительные пожелания к стилю ответа, " +
-          "совместимые с основной инструкцией:\n" +
-          userStylePreferences
-      });
-    }
-
-    const requested = Number(body.max_tokens);
+    const requested = Number(
+      body.max_tokens
+    );
 
     const maxTokens =
       Number.isFinite(requested) &&
@@ -720,28 +838,18 @@ export default async function handler(req, res) {
         : 3072;
 
     const stream = body.stream === true;
-
-    const keys = [
-      process.env.API_KEY,
-      process.env.API_KEY_2
-    ]
-      .map(value => String(value || "").trim())
-      .filter(
-        (value, index, arr) =>
-          value && arr.indexOf(value) === index
-      );
-
-    if (!keys.length) {
-      throw createError(
-        500,
-        "API-ключи не настроены."
-      );
-    }
+    const keys = configuredKeys();
 
     const budgets = [
       ...new Set(
-        [maxTokens, 3072, 2048, 1024]
-          .filter(n => n <= maxTokens)
+        [
+          maxTokens,
+          3072,
+          2048,
+          1024
+        ].filter(
+          value => value <= maxTokens
+        )
       )
     ];
 
@@ -753,7 +861,7 @@ export default async function handler(req, res) {
     let quotaMessage = "";
     let lastError = "";
 
-    stage = "anymodel";
+    stage = "tooken";
 
     keyLoop:
     for (
@@ -762,26 +870,32 @@ export default async function handler(req, res) {
       keyIndex++
     ) {
       for (const tokens of budgets) {
-        upstream = await fetch(API_URL, {
-          method: "POST",
-          signal: controller.signal,
-          headers: {
-            Authorization: `Bearer ${keys[keyIndex]}`,
-            "Content-Type": "application/json",
-            Accept: stream
-              ? "text/event-stream"
-              : "application/json"
-          },
-          body: JSON.stringify({
-            model,
-            messages,
-            stream,
-            max_tokens: tokens
-          })
-        });
+        upstream = await fetch(
+          API_URL,
+          {
+            method: "POST",
+            signal: controller.signal,
+            headers: {
+              Authorization:
+                `Bearer ${keys[keyIndex]}`,
+              "Content-Type":
+                "application/json",
+              Accept: stream
+                ? "text/event-stream"
+                : "application/json"
+            },
+            body: JSON.stringify({
+              model,
+              messages,
+              stream,
+              max_tokens: tokens
+            })
+          }
+        );
 
         if (!upstream.ok) {
-          lastError = await upstreamError(upstream);
+          lastError =
+            await upstreamError(upstream);
 
           if (
             isQuotaFailure(
@@ -812,8 +926,8 @@ export default async function handler(req, res) {
           }
 
           throw createError(
-            502,
-            `AnyModel ${upstream.status}: ${lastError}`
+            upstream.status === 429 ? 429 : 502,
+            `Tooken Club ${upstream.status}: ${lastError}`
           );
         }
 
@@ -822,13 +936,17 @@ export default async function handler(req, res) {
 
         if (
           stream &&
-          contentType.includes("text/event-stream") &&
+          contentType.includes(
+            "text/event-stream"
+          ) &&
           upstream.body
         ) {
-          streamPeek = await peekSse(upstream);
+          streamPeek =
+            await peekSse(upstream);
 
           if (streamPeek.quota) {
-            quotaMessage = streamPeek.reason;
+            quotaMessage =
+              streamPeek.reason;
 
             await streamPeek.reader
               .cancel()
@@ -838,15 +956,18 @@ export default async function handler(req, res) {
 
             continue keyLoop;
           }
+
         } else {
-          const raw = await upstream.text();
+          const raw =
+            await upstream.text();
 
           try {
-            jsonData = JSON.parse(raw);
+            jsonData =
+              JSON.parse(raw);
           } catch {
             throw createError(
               502,
-              "AnyModel вернул не JSON."
+              "Tooken Club вернул не JSON."
             );
           }
 
@@ -854,7 +975,12 @@ export default async function handler(req, res) {
             const reason =
               upstreamErrorMessage(jsonData);
 
-            if (isQuotaFailure(200, reason)) {
+            if (
+              isQuotaFailure(
+                200,
+                reason
+              )
+            ) {
               quotaMessage = reason;
               jsonData = null;
 
@@ -863,7 +989,7 @@ export default async function handler(req, res) {
 
             throw createError(
               502,
-              `AnyModel: ${reason}`
+              `Tooken Club: ${reason}`
             );
           }
         }
@@ -875,7 +1001,7 @@ export default async function handler(req, res) {
 
       throw createError(
         502,
-        `AnyModel: ${
+        `Tooken Club: ${
           lastError ||
           "параметр max_tokens не поддерживается"
         }`
@@ -887,14 +1013,14 @@ export default async function handler(req, res) {
         throw createError(
           429,
           keys.length === 1
-            ? "Баланс основного API закончился. Настрой API_KEY_2."
+            ? "Баланс Tooken Club закончился. Настрой второй API-ключ."
             : "Баланс или квота закончились на обоих API-ключах."
         );
       }
 
       throw createError(
         502,
-        `AnyModel: ${
+        `Tooken Club: ${
           lastError ||
           "Не удалось получить ответ."
         }`
@@ -903,7 +1029,9 @@ export default async function handler(req, res) {
 
     res.setHeader(
       "X-Venus-Key-Fallback",
-      chosenKeyIndex > 0 ? "true" : "false"
+      chosenKeyIndex > 0
+        ? "true"
+        : "false"
     );
 
     const contentType =
@@ -919,7 +1047,8 @@ export default async function handler(req, res) {
       res.writeHead(200, {
         "Content-Type":
           "text/event-stream; charset=utf-8",
-        "Cache-Control": "no-cache, no-transform",
+        "Cache-Control":
+          "no-cache, no-transform",
         "X-Accel-Buffering": "no"
       });
 
@@ -928,7 +1057,9 @@ export default async function handler(req, res) {
           !res.destroyed &&
           !res.writableEnded
         ) {
-          res.write(": venus-ping\n\n");
+          res.write(
+            ": venus-ping\n\n"
+          );
         }
       }, 15000);
 
@@ -947,7 +1078,9 @@ export default async function handler(req, res) {
 
         res.write(
           `data: ${JSON.stringify({
-            error: { message }
+            error: {
+              message
+            }
           })}\n\n`
         );
       };
@@ -979,25 +1112,29 @@ export default async function handler(req, res) {
           }
         }
 
-        if (controller.signal.aborted) {
+        if (
+          controller.signal.aborted
+        ) {
           reportStreamError(
-            "Время ожидания AnyModel истекло. " +
-            "Полученный текст сохранён."
+            "Истекло время ожидания Tooken Club. Полученный текст сохранён."
           );
         }
+
       } catch (e) {
         if (
           controller.signal.aborted ||
-          e?.name === "AbortError"
+          e?.name === "AbortError" ||
+          /operation was aborted/i.test(
+            e?.message || ""
+          )
         ) {
           reportStreamError(
-            "Превышено время ожидания AnyModel. " +
-            "Полученный текст сохранён."
+            "Превышено время ожидания Tooken Club. Полученный текст сохранён."
           );
         } else {
           reportStreamError(
-            "Соединение с AnyModel прервалось: " +
-            (e?.message || "ошибка сети")
+            "Соединение с Tooken Club прервалось: " +
+              (e?.message || "ошибка сети")
           );
         }
       } finally {
@@ -1020,9 +1157,13 @@ export default async function handler(req, res) {
 
     stage = "json_response";
 
-    res.setHeader("Cache-Control", "no-store");
+    res.setHeader(
+      "Cache-Control",
+      "no-store"
+    );
 
     return res.status(200).json(jsonData);
+
   } catch (e) {
     const timedOut =
       controller.signal.aborted ||
@@ -1033,8 +1174,11 @@ export default async function handler(req, res) {
       : (e.status || 500);
 
     const message = timedOut
-      ? "AnyModel не завершил ответ до установленного времени ожидания."
-      : (e.message || "Ошибка сервера.");
+      ? "Tooken Club не завершил ответ до установленного времени ожидания."
+      : (
+          e.message ||
+          "Ошибка сервера."
+        );
 
     console.error("[Venus API]", {
       stage,
@@ -1048,7 +1192,9 @@ export default async function handler(req, res) {
         try {
           res.write(
             `data: ${JSON.stringify({
-              error: { message }
+              error: {
+                message
+              }
             })}\n\n`
           );
         } catch {}
@@ -1061,6 +1207,7 @@ export default async function handler(req, res) {
       error: message,
       stage
     });
+
   } finally {
     clearTimeout(timer);
   }
