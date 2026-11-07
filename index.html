@@ -1450,7 +1450,8 @@ function msgHTML(m,index) {
       <div class="bub">
         ${m.codeBuild && (m.truncated || m.resuming)
           ? `<div class="code-draft-private"><strong>${m.resuming?"Создание исходных файлов":m.content?"Генерация частично выполнена":"Не удалось получить код"}</strong><small>${m.content?`Код скрыт · ≈${estimateOutputTokens(m.content).toLocaleString("ru-RU")} токенов · ${countCodeLines(m.content).toLocaleString("ru-RU")} строк. `:"Модель пока не прислала ни одной строки кода. "}${m.resuming?"Получаю настоящий ответ API.":"Повторить можно вручную."}</small></div>`
-          : md(m.content || "", !!m.truncated && !m.codeBuild)}
+          : (m.content ? md(m.content, !!m.truncated && !m.codeBuild) : "")}
+        ${!m.codeBuild && m.error ? `<div class="err" role="alert">${esc(m.error)}</div>` : ""}
         ${m.codeBuild && m.resuming ? '<div class="code-build-result">Дополняю код и проверяю результат…</div>' : ''}
         ${m.truncated && m.codeBuild && !m.resuming ? `<div class="code-build-result">${m.tokenBudgetHit ? "Достигнут предел 30 000 токенов для одного проекта." : m.content ? "Полученные строки сохранены." : "Готовых файлов пока нет."}${m.resumeError ? " Причина: " + esc(m.resumeError) : ""}</div>` : ''}
         ${m.truncated && !m.codeBuild ? '<div class="code-build-result">Ответ прервался. Попробуйте повторить запрос.</div>' : ''}
@@ -1682,6 +1683,9 @@ async function buildApiMessages(chat) {
   if(systemPrompt) messages.push({role:"system",content:systemPrompt});
 
   for(const m of chat.messages) {
+    // Never send UI error messages, empty assistant placeholders or unfinished
+    // generation placeholders back to the model as if they were responses.
+    if(m.role==="assistant" && (m.error || !String(m.content||"").trim()))continue;
     const attachments=Array.isArray(m.attachments)?m.attachments:[];
     if(m.role!=="user" || !attachments.length) {
       messages.push({role:m.role,content:m.content||""});
@@ -2583,6 +2587,19 @@ async function buildRealProject(chat,message,headers,signal,progress) {
 }
 
 /* SEND */
+async function fetchNormalChat(payload,headers,signal) {
+  const sendOnce=(h)=>fetch(API_URL,{
+    method:"POST",headers:h,signal,body:JSON.stringify(payload)
+  });
+  let response=await sendOnce(headers);
+  // A user's Firebase ID token can expire while the page remains open.
+  if(response.status===401 && auth.currentUser && !signal.aborted) {
+    const fresh=await auth.currentUser.getIdToken(true);
+    headers.Authorization=`Bearer ${fresh}`;
+    response=await sendOnce(headers);
+  }
+  return response;
+}
 async function send(text,attachmentsOverride=null) {
   text=String(text||"").trim();
   const selected=attachmentsOverride===null?pendingAttachments.slice():attachmentsOverride.slice();
@@ -2605,6 +2622,10 @@ async function send(text,attachmentsOverride=null) {
   if(attachmentsOverride===null) {pendingAttachments=[];renderPendingAttachments();}
   $("inp").value="";grow();saveChats();renderList();renderMsgs();
   const am={role:"assistant",content:"",codeBuild,truncated:codeBuild,resuming:codeBuild};
+  // Persist the assistant turn before requesting the API. Otherwise an error
+  // removes the temporary loading bubble and leaves a completely blank chat.
+  c.messages.push(am);
+  saveChats();
   const liveHtml=codeBuild?codeBuildHtml(0,"Подготавливаю исходные файлы…"):'<div class="dots"><i></i><i></i><i></i></div>';
   $("wrap").insertAdjacentHTML("beforeend",`<div class="row" id="live"><div class="av"></div><div class="bub">${liveHtml}</div></div>`);
   const live=()=>$("live")?.lastElementChild;
@@ -2618,17 +2639,16 @@ async function send(text,attachmentsOverride=null) {
     const model=$("modelSelect").value;
     if(codeBuild) {
       am.projectState={task:text,model,files:[],requests:0,finished:false,lastError:""};
-      c.messages.push(am);saveChats();
       await buildRealProject(c,am,headers,ctrl.signal,progress);
       if(!am.content.trim())throw new Error(
         am.projectState.lastError || "AnyModel не прислал содержимое файла. Проверь доступность выбранной модели и настройки API_KEY."
       );
     } else {
       const messages=await buildApiMessages(c);
-      const response=await fetch(API_URL,{
-        method:"POST",headers,signal:ctrl.signal,
-        body:JSON.stringify({model,messages,stream:true,max_tokens:4096})
-      });
+      const response=await fetchNormalChat(
+        {model,messages,stream:true,max_tokens:4096},
+        headers,ctrl.signal
+      );
       if(!response.ok) {
         const raw=await response.text();let detail=raw;
         try {const obj=JSON.parse(raw);detail=obj.error?.message||obj.error||raw;}catch{}
@@ -2637,6 +2657,7 @@ async function send(text,attachmentsOverride=null) {
       let output="";
       const result=await readVenusResponse(response,piece=>{
         output+=piece;
+        am.content=output; // Keep every received fragment even if the stream breaks.
         const el=live();if(el)el.innerHTML=md(output);
         $("msgs").scrollTop=$("msgs").scrollHeight;
       });
@@ -2645,10 +2666,10 @@ async function send(text,attachmentsOverride=null) {
         const fallback=await requestVenusOnce(messages,model,headers,ctrl.signal,2048);
         output=fallback.text;
       }
-      if(!output.trim())throw new Error("Модель вернула пустой ответ. Попробуй другую модель.");
+      if(!output.trim())throw new Error("Модель не прислала видимого текста. Проверь выбранную модель, API-ключ и логи Vercel.");
       am.content=output;
+      am.error="";
       am.truncated=result.finishReason==="length" || !!result.interrupted;
-      c.messages.push(am);
     }
   } catch(e) {
     if(e.name!=="AbortError") {
@@ -2657,10 +2678,14 @@ async function send(text,attachmentsOverride=null) {
         am.truncated=true;
         am.resumeError=hint;
         if(am.projectState)am.projectState.lastError=hint;
+      } else {
+        am.error=hint;
+        am.truncated=!!am.content;
       }
       if(live())live().innerHTML=`<div class="err">${esc(hint)}${codeBuild?" · Можно продолжить с сохранённого места.":""}</div>`;
+    } else if(!codeBuild) {
+      am.error="Запрос остановлен.";
     }
-    if(!c.messages.includes(am) && am.content)c.messages.push(am);
   } finally {
     am.resuming=false;
     busy=false;ctrl=null;
