@@ -3,7 +3,7 @@ import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 
 const API_URL = "https://tooken.club/v1/chat/completions";
-const MODEL = "ds/deepseek-v4-flash-vision";
+const MODEL = "deepseek-v4.1-flash-1017";
 
 const VENUS_SYSTEM_PROMPT = `
 Ты Venus — технический специалист, инженер и разработчик Venus AI.
