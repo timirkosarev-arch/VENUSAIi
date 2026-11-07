@@ -6,7 +6,8 @@ const API_URL = "https://anymodel.org/v1/chat/completions";
 
 const MODELS = Object.freeze({
   flash: "claude-haiku-5-5",
-  high: "claude-sonnet-5-5"
+  high: "claude-sonnet-5-5",
+  deepseek: "ds/deepseek-v4-flash-vision"
 });
 
 const MAX_REQUEST_TOKENS = 30000;
@@ -71,10 +72,8 @@ function firebaseApp() {
     );
   }
 
-  account.private_key = account.private_key.replace(
-    /\\n/g,
-    "\n"
-  );
+  account.private_key =
+    account.private_key.replace(/\\n/g, "\n");
 
   return initializeApp({
     credential: cert(account),
@@ -190,14 +189,12 @@ async function convertImage(link, signal) {
     try {
       for (;;) {
         const { done, value } = await reader.read();
-
         if (done) break;
 
         size += value.byteLength;
 
         if (size > MAX_IMAGE_SIZE) {
           await reader.cancel();
-
           throw error(
             413,
             "Изображение больше 5 МБ."
@@ -258,6 +255,7 @@ async function normalizeContent(content, signal) {
         type: "text",
         text: part.text
       });
+
     } else if (
       part?.type === "image_url" &&
       typeof part.image_url?.url === "string"
@@ -359,19 +357,19 @@ async function peekSse(response) {
 
   while (prefix.length < 16384) {
     const result = await reader.read();
-
     done = result.done;
 
     if (done) break;
 
     pending.push(result.value);
 
-    prefix += decoder.decode(
-      result.value,
-      { stream: true }
-    );
+    prefix += decoder.decode(result.value, {
+      stream: true
+    });
 
-    if (/\r?\n\r?\n/.test(prefix)) break;
+    if (/\r?\n\r?\n/.test(prefix)) {
+      break;
+    }
   }
 
   const firstEvent = prefix.split(
@@ -385,7 +383,10 @@ async function peekSse(response) {
     .map(line => line.slice(5).trimStart())
     .join("\n");
 
-  if (dataText && dataText !== "[DONE]") {
+  if (
+    dataText &&
+    dataText !== "[DONE]"
+  ) {
     try {
       const event = JSON.parse(dataText);
 
@@ -416,7 +417,7 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     return res.status(200).json({
       ok: true,
-      version: "venus-abort-stream-fix-v3"
+      version: "venus-deepseek-vision-v4"
     });
   }
 
@@ -465,6 +466,7 @@ export default async function handler(req, res) {
       ...MODELS,
       "cc/claude-haiku-5-5": MODELS.flash,
       "cc/claude-sonnet-5-5": MODELS.high,
+      "ds/deepseek-v4-flash-vision": MODELS.deepseek,
       "cx/gpt-6-luna": MODELS.flash,
       "cx/gpt-6-sol": MODELS.high,
       "cx/gpt-6.1-sol": MODELS.high,
@@ -805,7 +807,8 @@ export default async function handler(req, res) {
           !res.destroyed &&
           !controller.signal.aborted
         ) {
-          const part = await streamPeek.reader.read();
+          const part =
+            await streamPeek.reader.read();
 
           done = part.done;
 
