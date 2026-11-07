@@ -4,12 +4,7 @@ import { getAuth } from "firebase-admin/auth";
 
 const API_URL = "https://anymodel.org/v1/chat/completions";
 
-const MODELS = Object.freeze({
-  flash: "claude-haiku-5-5",
-  high: "claude-sonnet-5-5",
-  deepseek: "ds/deepseek-v4-flash-vision"
-});
-
+const MODEL_DEEPSEEK = "ds/deepseek-v4-flash-vision";
 const MAX_REQUEST_TOKENS = 30000;
 const MAX_MESSAGES = 24;
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -72,8 +67,10 @@ function firebaseApp() {
     );
   }
 
-  account.private_key =
-    account.private_key.replace(/\\n/g, "\n");
+  account.private_key = account.private_key.replace(
+    /\\n/g,
+    "\n"
+  );
 
   return initializeApp({
     credential: cert(account),
@@ -91,8 +88,9 @@ async function authenticate(req) {
   }
 
   try {
-    return await getAuth(firebaseApp())
-      .verifyIdToken(bearer);
+    return await getAuth(firebaseApp()).verifyIdToken(
+      bearer
+    );
   } catch {
     throw error(
       401,
@@ -102,12 +100,10 @@ async function authenticate(req) {
 }
 
 function allowedImage(url) {
-  return (
-    url.protocol === "https:" &&
+  return url.protocol === "https:" &&
     ["i.ibb.co", "i.ibb.co.com"].includes(
       url.hostname.toLowerCase()
-    )
-  );
+    );
 }
 
 async function convertImage(link, signal) {
@@ -135,7 +131,9 @@ async function convertImage(link, signal) {
       signal
     });
 
-    if ([301, 302, 303, 307, 308].includes(res.status)) {
+    if (
+      [301, 302, 303, 307, 308].includes(res.status)
+    ) {
       const next = res.headers.get("location");
 
       if (!next) {
@@ -189,12 +187,14 @@ async function convertImage(link, signal) {
     try {
       for (;;) {
         const { done, value } = await reader.read();
+
         if (done) break;
 
         size += value.byteLength;
 
         if (size > MAX_IMAGE_SIZE) {
           await reader.cancel();
+
           throw error(
             413,
             "Изображение больше 5 МБ."
@@ -208,7 +208,10 @@ async function convertImage(link, signal) {
     }
 
     if (!size) {
-      throw error(400, "Фото пустое.");
+      throw error(
+        400,
+        "Фото пустое."
+      );
     }
 
     return (
@@ -255,7 +258,6 @@ async function normalizeContent(content, signal) {
         type: "text",
         text: part.text
       });
-
     } else if (
       part?.type === "image_url" &&
       typeof part.image_url?.url === "string"
@@ -324,7 +326,10 @@ async function upstreamError(res) {
 }
 
 function isQuotaFailure(status, detail) {
-  if (status === 402 || status === 429) {
+  if (
+    status === 402 ||
+    status === 429
+  ) {
     return true;
   }
 
@@ -357,15 +362,17 @@ async function peekSse(response) {
 
   while (prefix.length < 16384) {
     const result = await reader.read();
+
     done = result.done;
 
     if (done) break;
 
     pending.push(result.value);
 
-    prefix += decoder.decode(result.value, {
-      stream: true
-    });
+    prefix += decoder.decode(
+      result.value,
+      { stream: true }
+    );
 
     if (/\r?\n\r?\n/.test(prefix)) {
       break;
@@ -417,7 +424,7 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     return res.status(200).json({
       ok: true,
-      version: "venus-deepseek-vision-v4"
+      version: "venus-deepseek-only-v5"
     });
   }
 
@@ -462,28 +469,9 @@ export default async function handler(req, res) {
       );
     }
 
-    const aliases = {
-      ...MODELS,
-      "cc/claude-haiku-5-5": MODELS.flash,
-      "cc/claude-sonnet-5-5": MODELS.high,
-      "ds/deepseek-v4-flash-vision": MODELS.deepseek,
-      "cx/gpt-6-luna": MODELS.flash,
-      "cx/gpt-6-sol": MODELS.high,
-      "cx/gpt-6.1-sol": MODELS.high,
-      "cx/gpt-6-astra": MODELS.high,
-      "cc/claude-opus-5-5": MODELS.high,
-      astro: MODELS.high,
-      pro: MODELS.high
-    };
-
-    const model = aliases[body.model] || body.model;
-
-    if (!Object.values(MODELS).includes(model)) {
-      throw error(
-        400,
-        "Неизвестная модель."
-      );
-    }
+    // Всегда используем DeepSeek.
+    // Клиент не может переключить модель.
+    const model = MODEL_DEEPSEEK;
 
     stage = "firebase_auth";
 
@@ -500,7 +488,10 @@ export default async function handler(req, res) {
       !Array.isArray(body.messages) ||
       !body.messages.length
     ) {
-      throw error(400, "Нет сообщений.");
+      throw error(
+        400,
+        "Нет сообщений."
+      );
     }
 
     stage = "normalize_messages";
@@ -672,6 +663,7 @@ export default async function handler(req, res) {
               .catch(() => {});
 
             streamPeek = null;
+
             continue keyLoop;
           }
         } else {
@@ -691,10 +683,7 @@ export default async function handler(req, res) {
               upstreamErrorMessage(jsonData);
 
             if (
-              isQuotaFailure(
-                200,
-                reason
-              )
+              isQuotaFailure(200, reason)
             ) {
               quotaMessage = reason;
 
@@ -720,8 +709,10 @@ export default async function handler(req, res) {
 
       throw error(
         502,
-        `AnyModel: ${lastError ||
-          "параметр max_tokens не поддерживается"}`
+        `AnyModel: ${
+          lastError ||
+          "параметр max_tokens не поддерживается"
+        }`
       );
     }
 
@@ -730,15 +721,16 @@ export default async function handler(req, res) {
         throw error(
           429,
           keys.length === 1
-            ? "Баланс или квота основного AnyModel API закончились. Добавь API_KEY_2 в Vercel."
+            ? "Баланс или квота основного API закончились. Добавь API_KEY_2 в Vercel."
             : "Баланс или квота закончились на обоих API-ключах AnyModel."
         );
       }
 
       throw error(
         502,
-        `AnyModel: ${lastError ||
-          "не удалось получить ответ"}`
+        `AnyModel: ${
+          lastError || "не удалось получить ответ"
+        }`
       );
     }
 
@@ -836,7 +828,7 @@ export default async function handler(req, res) {
         } else {
           reportStreamError(
             "Соединение с AnyModel прервалось: " +
-              (e?.message || "ошибка сети")
+            (e?.message || "ошибка сети")
           );
         }
       } finally {
