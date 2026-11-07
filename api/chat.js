@@ -3,15 +3,23 @@ import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 
 const API_URL = "https://anymodel.org/v1/chat/completions";
+
 const MODELS = Object.freeze({
-  flash: "cc/claude-haiku-5-5",
-  high: "cc/claude-sonnet-5-5"
+  flash: "claude-haiku-5-5",
+  high: "claude-sonnet-5-5"
 });
 
 const MAX_REQUEST_TOKENS = 30000;
 const MAX_MESSAGES = 24;
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
-const API_TIMEOUT_MS = 125000;
+
+const API_TIMEOUT_MS = Math.max(
+  10000,
+  Math.min(
+    290000,
+    Number(process.env.VENUS_API_TIMEOUT_MS) || 52000
+  )
+);
 
 const IMAGE_MIME = new Set([
   "image/jpeg",
@@ -28,9 +36,11 @@ function firebaseApp() {
   const old = getApps().find(
     app => app.name === "venus-ai-api"
   );
+
   if (old) return old;
 
   let account;
+
   try {
     account = process.env.FIREBASE_SERVICE_ACCOUNT_JSON
       ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON)
@@ -40,7 +50,10 @@ function firebaseApp() {
           private_key: process.env.FIREBASE_PRIVATE_KEY
         };
   } catch {
-    throw error(500, "Неверный FIREBASE_SERVICE_ACCOUNT_JSON.");
+    throw error(
+      500,
+      "Неверный FIREBASE_SERVICE_ACCOUNT_JSON."
+    );
   }
 
   if (
@@ -48,14 +61,21 @@ function firebaseApp() {
     !account?.client_email ||
     !account?.private_key
   ) {
-    throw error(500, "Firebase Admin не настроен.");
+    throw error(
+      500,
+      "Firebase Admin не настроен."
+    );
   }
 
   if (!process.env.FIREBASE_DATABASE_URL) {
-    throw error(500, "FIREBASE_DATABASE_URL не настроен.");
+    throw error(
+      500,
+      "FIREBASE_DATABASE_URL не настроен."
+    );
   }
 
-  account.private_key = account.private_key.replace(/\\n/g, "\n");
+  account.private_key =
+    account.private_key.replace(/\\n/g, "\n");
 
   return initializeApp({
     credential: cert(account),
@@ -64,13 +84,20 @@ function firebaseApp() {
 }
 
 async function authenticate(req) {
-  const bearer = String(req.headers.authorization || "")
-    .match(/^Bearer\s+(.+)$/i)?.[1];
+  const bearer = String(
+    req.headers.authorization || ""
+  ).match(/^Bearer\s+(.+)$/i)?.[1];
 
-  if (!bearer) throw error(401, "Войдите в Venus AI.");
+  if (!bearer) {
+    throw error(
+      401,
+      "Войдите в Venus AI."
+    );
+  }
 
   try {
-    return await getAuth(firebaseApp()).verifyIdToken(bearer);
+    return await getAuth(firebaseApp())
+      .verifyIdToken(bearer);
   } catch {
     throw error(
       401,
@@ -80,23 +107,32 @@ async function authenticate(req) {
 }
 
 function allowedImage(url) {
-  return url.protocol === "https:" &&
+  return (
+    url.protocol === "https:" &&
     ["i.ibb.co", "i.ibb.co.com"].includes(
       url.hostname.toLowerCase()
-    );
+    )
+  );
 }
 
 async function convertImage(link, signal) {
   let url;
+
   try {
     url = new URL(link);
   } catch {
-    throw error(400, "Некорректная ссылка на фото.");
+    throw error(
+      400,
+      "Некорректная ссылка на фото."
+    );
   }
 
   for (let i = 0; i < 5; i++) {
     if (!allowedImage(url)) {
-      throw error(400, "Поддерживаются только ссылки ImgBB.");
+      throw error(
+        400,
+        "Поддерживаются только ссылки ImgBB."
+      );
     }
 
     const res = await fetch(url, {
@@ -104,7 +140,9 @@ async function convertImage(link, signal) {
       signal
     });
 
-    if ([301, 302, 303, 307, 308].includes(res.status)) {
+    if (
+      [301, 302, 303, 307, 308].includes(res.status)
+    ) {
       const next = res.headers.get("location");
 
       if (!next) {
@@ -119,24 +157,40 @@ async function convertImage(link, signal) {
     }
 
     if (!res.ok) {
-      throw error(502, `Ошибка ImgBB: ${res.status}.`);
+      throw error(
+        502,
+        `Ошибка ImgBB: ${res.status}.`
+      );
     }
 
-    const type = (res.headers.get("content-type") || "")
-      .split(";")[0].trim().toLowerCase();
+    const type = (
+      res.headers.get("content-type") || ""
+    ).split(";")[0].trim().toLowerCase();
 
     if (!IMAGE_MIME.has(type)) {
-      throw error(400, "Тип фото не поддерживается.");
+      throw error(
+        400,
+        "Тип фото не поддерживается."
+      );
     }
 
     if (
-      Number(res.headers.get("content-length") || 0) >
-      MAX_IMAGE_SIZE
+      Number(
+        res.headers.get("content-length") || 0
+      ) > MAX_IMAGE_SIZE
     ) {
-      throw error(413, "Изображение больше 5 МБ.");
+      throw error(
+        413,
+        "Изображение больше 5 МБ."
+      );
     }
 
-    if (!res.body) throw error(502, "Фото пустое.");
+    if (!res.body) {
+      throw error(
+        502,
+        "Фото пустое."
+      );
+    }
 
     const reader = res.body.getReader();
     const chunks = [];
@@ -145,13 +199,18 @@ async function convertImage(link, signal) {
     try {
       for (;;) {
         const { done, value } = await reader.read();
+
         if (done) break;
 
         size += value.byteLength;
 
         if (size > MAX_IMAGE_SIZE) {
           await reader.cancel();
-          throw error(413, "Изображение больше 5 МБ.");
+
+          throw error(
+            413,
+            "Изображение больше 5 МБ."
+          );
         }
 
         chunks.push(Buffer.from(value));
@@ -160,10 +219,17 @@ async function convertImage(link, signal) {
       reader.releaseLock();
     }
 
-    if (!size) throw error(400, "Фото пустое.");
+    if (!size) {
+      throw error(
+        400,
+        "Фото пустое."
+      );
+    }
 
-    return `data:${type};base64,` +
-      Buffer.concat(chunks).toString("base64");
+    return (
+      `data:${type};base64,` +
+      Buffer.concat(chunks).toString("base64")
+    );
   }
 
   throw error(
@@ -175,8 +241,12 @@ async function convertImage(link, signal) {
 async function normalizeContent(content, signal) {
   if (typeof content === "string") {
     if (content.length > 250000) {
-      throw error(413, "Слишком длинное сообщение.");
+      throw error(
+        413,
+        "Слишком длинное сообщение."
+      );
     }
+
     return content;
   }
 
@@ -190,7 +260,10 @@ async function normalizeContent(content, signal) {
       typeof part.text === "string"
     ) {
       if (part.text.length > 250000) {
-        throw error(413, "Слишком длинный текст файла.");
+        throw error(
+          413,
+          "Слишком длинный текст файла."
+        );
       }
 
       result.push({
@@ -210,8 +283,10 @@ async function normalizeContent(content, signal) {
 
         if (
           !match ||
-          Buffer.from(match[2], "base64").length >
-            MAX_IMAGE_SIZE
+          Buffer.from(
+            match[2],
+            "base64"
+          ).length > MAX_IMAGE_SIZE
         ) {
           throw error(
             400,
@@ -219,7 +294,10 @@ async function normalizeContent(content, signal) {
           );
         }
       } else {
-        url = await convertImage(url, signal);
+        url = await convertImage(
+          url,
+          signal
+        );
       }
 
       result.push({
@@ -236,13 +314,17 @@ async function normalizeContent(content, signal) {
 }
 
 function tokenParamError(status, detail) {
-  return [400, 422].includes(status) &&
+  return (
+    [400, 422].includes(status) &&
     /(?:max[_ -]?(?:completion[_ -]?)?tokens?|output.{0,20}tokens?|context.{0,20}length)/i
-      .test(detail);
+      .test(detail)
+  );
 }
 
 async function upstreamError(res) {
-  const raw = (await res.text()).slice(0, 1200);
+  const raw = (
+    await res.text()
+  ).slice(0, 1200);
 
   try {
     const parsed = JSON.parse(raw);
@@ -259,7 +341,12 @@ async function upstreamError(res) {
 }
 
 function isQuotaFailure(status, detail) {
-  if (status === 402 || status === 429) return true;
+  if (
+    status === 402 ||
+    status === 429
+  ) {
+    return true;
+  }
 
   return /(?:insufficient[_\s-]?(?:quota|balance|credit|credits|funds)|(?:quota|balance|credits?)[_\s-]?(?:exceeded|exhausted|depleted|used\s*up)|(?:out\s+of|no\s+more)[_\s-]?(?:tokens?|credits?|funds)|billing[_\s-]?(?:limit|exceeded)|(?:баланс|квота|кредит)[^\n]{0,45}(?:законч|исчерп|недостаточ))/i
     .test(String(detail || ""));
@@ -284,31 +371,44 @@ async function peekSse(response) {
   const reader = response.body.getReader();
   const pending = [];
   const decoder = new TextDecoder();
+
   let prefix = "";
   let done = false;
 
   while (prefix.length < 16384) {
     const result = await reader.read();
+
     done = result.done;
 
     if (done) break;
 
     pending.push(result.value);
-    prefix += decoder.decode(result.value, {
-      stream: true
-    });
 
-    if (/\r?\n\r?\n/.test(prefix)) break;
+    prefix += decoder.decode(
+      result.value,
+      { stream: true }
+    );
+
+    if (/\r?\n\r?\n/.test(prefix)) {
+      break;
+    }
   }
 
-  const firstEvent = prefix.split(/\r?\n\r?\n/, 1)[0];
+  const firstEvent = prefix.split(
+    /\r?\n\r?\n/,
+    1
+  )[0];
 
-  const dataText = firstEvent.split(/\r?\n/)
+  const dataText = firstEvent
+    .split(/\r?\n/)
     .filter(line => line.startsWith("data:"))
     .map(line => line.slice(5).trimStart())
     .join("\n");
 
-  if (dataText && dataText !== "[DONE]") {
+  if (
+    dataText &&
+    dataText !== "[DONE]"
+  ) {
     try {
       const event = JSON.parse(dataText);
 
@@ -339,7 +439,7 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     return res.status(200).json({
       ok: true,
-      version: "venus-two-claude-failover-v1"
+      version: "venus-chat-visible-errors-v2"
     });
   }
 
@@ -378,11 +478,16 @@ export default async function handler(req, res) {
       typeof body !== "object" ||
       Array.isArray(body)
     ) {
-      throw error(400, "Некорректный запрос.");
+      throw error(
+        400,
+        "Некорректный запрос."
+      );
     }
 
     const aliases = {
       ...MODELS,
+      "cc/claude-haiku-5-5": MODELS.flash,
+      "cc/claude-sonnet-5-5": MODELS.high,
       "cx/gpt-6-luna": MODELS.flash,
       "cx/gpt-6-sol": MODELS.high,
       "cx/gpt-6.1-sol": MODELS.high,
@@ -395,24 +500,35 @@ export default async function handler(req, res) {
     const model = aliases[body.model] || body.model;
 
     if (!Object.values(MODELS).includes(model)) {
-      throw error(400, "Неизвестная модель.");
+      throw error(
+        400,
+        "Неизвестная модель."
+      );
     }
 
     stage = "firebase_auth";
+
     await authenticate(req);
 
     if (controller.signal.aborted) {
-      throw error(503, "Время авторизации истекло.");
+      throw error(
+        503,
+        "Время авторизации истекло."
+      );
     }
 
     if (
       !Array.isArray(body.messages) ||
       !body.messages.length
     ) {
-      throw error(400, "Нет сообщений.");
+      throw error(
+        400,
+        "Нет сообщений."
+      );
     }
 
     stage = "normalize_messages";
+
     const messages = [];
 
     for (
@@ -442,8 +558,13 @@ export default async function handler(req, res) {
       }
     }
 
-    if (!messages.some(m => m.role === "user")) {
-      throw error(400, "Нет запроса пользователя.");
+    if (!messages.some(
+      m => m.role === "user"
+    )) {
+      throw error(
+        400,
+        "Нет запроса пользователя."
+      );
     }
 
     const requested = Number(body.max_tokens);
@@ -469,7 +590,10 @@ export default async function handler(req, res) {
       );
 
     if (!keys.length) {
-      throw error(500, "Укажи API_KEY в Vercel.");
+      throw error(
+        500,
+        "Укажи API_KEY в Vercel."
+      );
     }
 
     const budgets = [
@@ -519,7 +643,10 @@ export default async function handler(req, res) {
           lastError = await upstreamError(upstream);
 
           if (
-            isQuotaFailure(upstream.status, lastError)
+            isQuotaFailure(
+              upstream.status,
+              lastError
+            )
           ) {
             quotaMessage = lastError;
 
@@ -535,7 +662,10 @@ export default async function handler(req, res) {
           }
 
           if (
-            tokenParamError(upstream.status, lastError)
+            tokenParamError(
+              upstream.status,
+              lastError
+            )
           ) {
             continue;
           }
@@ -568,6 +698,7 @@ export default async function handler(req, res) {
               .catch(() => {});
 
             streamPeek = null;
+
             continue keyLoop;
           }
         } else {
@@ -586,7 +717,12 @@ export default async function handler(req, res) {
             const reason =
               upstreamErrorMessage(jsonData);
 
-            if (isQuotaFailure(200, reason)) {
+            if (
+              isQuotaFailure(
+                200,
+                reason
+              )
+            ) {
               quotaMessage = reason;
 
               console.warn(
@@ -595,14 +731,19 @@ export default async function handler(req, res) {
               );
 
               jsonData = null;
+
               continue keyLoop;
             }
 
-            throw error(502, `AnyModel: ${reason}`);
+            throw error(
+              502,
+              `AnyModel: ${reason}`
+            );
           }
         }
 
         chosenKeyIndex = keyIndex;
+
         break keyLoop;
       }
 
@@ -669,10 +810,14 @@ export default async function handler(req, res) {
           !res.destroyed &&
           !controller.signal.aborted
         ) {
-          const part = await streamPeek.reader.read();
+          const part =
+            await streamPeek.reader.read();
+
           done = part.done;
 
-          if (!done) res.write(part.value);
+          if (!done) {
+            res.write(part.value);
+          }
         }
 
         if (
@@ -709,7 +854,10 @@ export default async function handler(req, res) {
 
     stage = "json_response";
 
-    res.setHeader("Cache-Control", "no-store");
+    res.setHeader(
+      "Cache-Control",
+      "no-store"
+    );
 
     return res.status(200).json(jsonData);
   } catch (e) {
