@@ -278,6 +278,13 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 @media(max-width:720px){.line-meter{padding:6px 8px}}
 @media(max-width:540px){.token-meter,.line-meter{font-size:10px;padding:5px 6px;letter-spacing:-.15px}}
 @media(max-width:385px){.token-meter{max-width:90px;overflow:hidden;text-overflow:ellipsis}.token-meter #tokenCount{overflow:hidden;text-overflow:ellipsis}.line-meter{max-width:67px;overflow:hidden;text-overflow:ellipsis}}
+
+/* Fixed DeepSeek model; no model picker and no global counters. */
+.fixed-model{display:inline-flex;align-items:center;flex-shrink:0;min-height:32px;padding:6px 11px;border:1px solid var(--line);border-radius:999px;color:var(--muted);background:var(--panel);font-size:12.5px;font-weight:650;letter-spacing:.01em;white-space:nowrap;user-select:none}
+@media(max-width:540px){.fixed-model{font-size:11.5px;padding:5px 8px}}
+/* Code block's own line count, always at the bottom of its frame. */
+.pre .code-footer{display:flex;align-items:center;justify-content:flex-end;min-height:29px;padding:6px 13px;border-top:1px solid var(--line);background:var(--panel2);color:var(--muted);font-size:11.5px;font-weight:550;font-variant-numeric:tabular-nums}
+@media(max-width:600px){.pre .code-footer{padding:5px 10px;font-size:11px}}
 </style>
 </head>
 
@@ -382,19 +389,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
   <button class="burger" id="burger" type="button" aria-label="Открыть меню"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
   <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Скрыть боковую панель" title="Боковая панель"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18"/></svg></button>
   <div class="title" id="ttl">Venus AI</div>
-  <div id="tokenMeter" class="token-meter" title="Расход токенов вашего аккаунта в этом браузере. Если API не вернул usage, показывается оценка.">
-    <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 10-12h-7l0-8Z"/></svg>
-    <span id="tokenCount">0 токенов</span>
-  </div>
-  <div id="lineMeter" class="token-meter line-meter" title="Строки кода в ответах текущего чата (в том числе создаваемый сейчас код).">
-    <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M10 19h4"/></svg>
-    <span id="lineCount">0 строк</span>
-  </div>
-  <select class="model-select" id="modelSelect" title="Модель Venus AI" aria-label="Выбрать модель">
-    <option value="cc/claude-haiku-5-5">Flash — Claude Haiku 5.5</option>
-    <option value="cc/claude-sonnet-5-5">High — Claude Sonnet 5.5</option>
-    <option value="ds/deepseek-v4-flash-vision" title="DeepSeek V4 Flash Vision">DeepSeek — Безотказная</option>
-  </select>
+  <span class="fixed-model" title="DeepSeek V4 Flash Vision" aria-label="Безотказная модель">Безотказная модель</span>
   <div class="top-right">
     <button class="top-new" id="topNewBtn" type="button" title="Новый чат" aria-label="Новый чат"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L10 16l-4 1 1-4Z"/><path d="M4 4h7M4 4v16h16v-7"/></svg></button>
     <button class="theme-toggle" id="themeToggle" type="button" title="Сменить тему" aria-label="Сменить тему"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.985 12.486A9 9 0 0 1 11.514 3.01 9 9 0 1 0 20.985 12.486Z"/></svg></button>
@@ -456,8 +451,8 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 <div class="mod" id="proMod">
   <div class="card pro-card">
     <div class="pro-kicker">VENUS AI PRO</div>
-    <h2>Claude Opus 5.5</h2>
-    <p class="pro-description">Доступны Flash, High и DeepSeek.</p>
+    <h2>Venus AI Pro</h2>
+    <p class="pro-description">Модель чата: DeepSeek V4 Flash Vision.</p>
     <div class="pro-price-line">
       <span class="old-price">$20</span>
       <span class="new-price">$10</span>
@@ -577,17 +572,12 @@ const DEFAULT_SYS = `Ты Venus AI — сильный и практичный И
 - Не сокращай решение без просьбы. Не добавляй длинных нравоучений.
 - При неоднозначностях выбирай разумные настройки самостоятельно; задавай вопрос только при реальной необходимости.`;
 
-const MODELS = {
-  flash: "cc/claude-haiku-5-5",
-  high: "cc/claude-sonnet-5-5",
-  deepseek: "ds/deepseek-v4-flash-vision"
-};
+const MODEL_DEEPSEEK = "ds/deepseek-v4-flash-vision";
 
 const ADMIN_EMAIL = "flexadssq@gmail.com";
 const PRO_STORAGE_KEY = "venus_pro_grants_v1";
 const PRO_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 
-const ALL_MODEL_VALUES = new Set(Object.values(MODELS));
 
 const store = {
 
@@ -1007,13 +997,7 @@ onAuthStateChanged(auth,user => {
     : savedSystem;
   if (!savedSystem || savedSystem === LEGACY_DEFAULT_SYS) saveSystem();
 
-  const savedModel = store.get(modelKey(settingsId),MODELS.flash);
-  const selectedModel = ["cx/gpt-6-astra", "cc/claude-opus-5-5", "cx/gpt-6-sol", "cx/gpt-6.1-sol"].includes(savedModel)
-    ? MODELS.high
-    : ["cx/gpt-6-luna"].includes(savedModel) ? MODELS.flash : savedModel;
-  $("modelSelect").value = ALL_MODEL_VALUES.has(selectedModel)
-    ? selectedModel
-    : MODELS.flash;
+  // Модель фиксирована для всех чатов и не зависит от старых настроек пользователя.
 
   $("accountName").textContent = user
     ? (user.displayName || "Пользователь")
@@ -1056,12 +1040,7 @@ $("codeModeBtn").onclick=()=>{
     : "Включить генерацию полного кода прямо в чате";
 };
 
-/* MODEL SELECTION */
-
-$("modelSelect").addEventListener("change",() => {
-  if (!currentUser) return;
-  store.set(modelKey(currentUser.uid),$("modelSelect").value);
-});
+/* Выбор модели отключён: всегда используется DeepSeek. */
 
 
 /* MARKDOWN */
@@ -1238,7 +1217,8 @@ function md(t,forceIncomplete=false) {
     const fileName=filenameForCodeBlock(block);
     const code=block.c; // retain every character and trailing newline
     const complete=block.complete && !forceIncomplete && isValidCodeBlock(block);
-    const lines=code ? code.split("\n").length : 0;
+    const lines=code ? code.replace(/\n$/, "").split("\n").length : 0;
+    const lineWord=(n)=>n%10===1&&n%100!==11?"строка":([2,3,4].includes(n%10)&&!(n%100>=12&&n%100<=14)?"строки":"строк");
     return `<div class="pre" data-incomplete="${!complete}" data-filename="${esc(fileName)}">
       <div class="h">
         <span>${esc(fileName)}${complete?"":" · печатает…"}</span>
@@ -1248,6 +1228,7 @@ function md(t,forceIncomplete=false) {
         </div>
       </div>
       <pre><code>${esc(code)}</code></pre>
+      <div class="code-footer" aria-label="Количество строк кода">${lines.toLocaleString("ru-RU")} ${lineWord(lines)}</div>
     </div>`;
   });
 
@@ -2547,7 +2528,7 @@ async function send(text,attachmentsOverride=null) {
   busy=true;ctrl=new AbortController();upd();
   try {
     const headers={"Content-Type":"application/json", "Authorization":`Bearer ${await auth.currentUser.getIdToken()}`};
-    const model=$("modelSelect").value;
+    const model=MODEL_DEEPSEEK;
     const messages=await buildApiMessages(c);
     if(wantsCode) {
       const inlineCodeInstruction=`Пользователь хочет рабочий программный код. Начинай сразу с реализации. Выводи полный исходный код прямо в ответе Markdown-блоками с языком, с указанием "Файл: имя.ext" перед каждым файлом. Не используй артефакты, скрытые черновики, этапы подготовки, TODO, заглушки или "остальной код без изменений". Не проси исходный файл, если он уже есть во вложениях или истории. Если код слишком длинный для одного ответа, допиши максимально цельную часть и предложи продолжение. Не заявляй, что тестировал без реального теста.`;
