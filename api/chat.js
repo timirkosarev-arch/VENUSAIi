@@ -16,8 +16,8 @@ const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const API_TIMEOUT_MS = Math.max(
   10000,
   Math.min(
-    290000,
-    Number(process.env.VENUS_API_TIMEOUT_MS) || 52000
+    270000,
+    Number(process.env.VENUS_API_TIMEOUT_MS) || 240000
   )
 );
 
@@ -61,10 +61,7 @@ function firebaseApp() {
     !account?.client_email ||
     !account?.private_key
   ) {
-    throw error(
-      500,
-      "Firebase Admin не настроен."
-    );
+    throw error(500, "Firebase Admin не настроен.");
   }
 
   if (!process.env.FIREBASE_DATABASE_URL) {
@@ -74,8 +71,10 @@ function firebaseApp() {
     );
   }
 
-  account.private_key =
-    account.private_key.replace(/\\n/g, "\n");
+  account.private_key = account.private_key.replace(
+    /\\n/g,
+    "\n"
+  );
 
   return initializeApp({
     credential: cert(account),
@@ -89,10 +88,7 @@ async function authenticate(req) {
   ).match(/^Bearer\s+(.+)$/i)?.[1];
 
   if (!bearer) {
-    throw error(
-      401,
-      "Войдите в Venus AI."
-    );
+    throw error(401, "Войдите в Venus AI.");
   }
 
   try {
@@ -140,9 +136,7 @@ async function convertImage(link, signal) {
       signal
     });
 
-    if (
-      [301, 302, 303, 307, 308].includes(res.status)
-    ) {
+    if ([301, 302, 303, 307, 308].includes(res.status)) {
       const next = res.headers.get("location");
 
       if (!next) {
@@ -186,10 +180,7 @@ async function convertImage(link, signal) {
     }
 
     if (!res.body) {
-      throw error(
-        502,
-        "Фото пустое."
-      );
+      throw error(502, "Фото пустое.");
     }
 
     const reader = res.body.getReader();
@@ -220,10 +211,7 @@ async function convertImage(link, signal) {
     }
 
     if (!size) {
-      throw error(
-        400,
-        "Фото пустое."
-      );
+      throw error(400, "Фото пустое.");
     }
 
     return (
@@ -294,10 +282,7 @@ async function normalizeContent(content, signal) {
           );
         }
       } else {
-        url = await convertImage(
-          url,
-          signal
-        );
+        url = await convertImage(url, signal);
       }
 
       result.push({
@@ -341,10 +326,7 @@ async function upstreamError(res) {
 }
 
 function isQuotaFailure(status, detail) {
-  if (
-    status === 402 ||
-    status === 429
-  ) {
+  if (status === 402 || status === 429) {
     return true;
   }
 
@@ -389,9 +371,7 @@ async function peekSse(response) {
       { stream: true }
     );
 
-    if (/\r?\n\r?\n/.test(prefix)) {
-      break;
-    }
+    if (/\r?\n\r?\n/.test(prefix)) break;
   }
 
   const firstEvent = prefix.split(
@@ -405,10 +385,7 @@ async function peekSse(response) {
     .map(line => line.slice(5).trimStart())
     .join("\n");
 
-  if (
-    dataText &&
-    dataText !== "[DONE]"
-  ) {
+  if (dataText && dataText !== "[DONE]") {
     try {
       const event = JSON.parse(dataText);
 
@@ -439,7 +416,7 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     return res.status(200).json({
       ok: true,
-      version: "venus-chat-visible-errors-v2"
+      version: "venus-abort-stream-fix-v3"
     });
   }
 
@@ -521,10 +498,7 @@ export default async function handler(req, res) {
       !Array.isArray(body.messages) ||
       !body.messages.length
     ) {
-      throw error(
-        400,
-        "Нет сообщений."
-      );
+      throw error(400, "Нет сообщений.");
     }
 
     stage = "normalize_messages";
@@ -558,9 +532,7 @@ export default async function handler(req, res) {
       }
     }
 
-    if (!messages.some(
-      m => m.role === "user"
-    )) {
+    if (!messages.some(m => m.role === "user")) {
       throw error(
         400,
         "Нет запроса пользователя."
@@ -698,7 +670,6 @@ export default async function handler(req, res) {
               .catch(() => {});
 
             streamPeek = null;
-
             continue keyLoop;
           }
         } else {
@@ -731,7 +702,6 @@ export default async function handler(req, res) {
               );
 
               jsonData = null;
-
               continue keyLoop;
             }
 
@@ -743,7 +713,6 @@ export default async function handler(req, res) {
         }
 
         chosenKeyIndex = keyIndex;
-
         break keyLoop;
       }
 
@@ -793,6 +762,32 @@ export default async function handler(req, res) {
         "X-Accel-Buffering": "no"
       });
 
+      const heartbeat = setInterval(() => {
+        if (!res.destroyed && !res.writableEnded) {
+          res.write(": venus-ping\n\n");
+        }
+      }, 15000);
+
+      let errorSent = false;
+
+      const reportStreamError = message => {
+        if (
+          errorSent ||
+          res.destroyed ||
+          res.writableEnded
+        ) {
+          return;
+        }
+
+        errorSent = true;
+
+        res.write(
+          `data: ${JSON.stringify({
+            error: { message }
+          })}\n\n`
+        );
+      };
+
       try {
         for (const chunk of streamPeek.pending) {
           if (
@@ -810,8 +805,7 @@ export default async function handler(req, res) {
           !res.destroyed &&
           !controller.signal.aborted
         ) {
-          const part =
-            await streamPeek.reader.read();
+          const part = await streamPeek.reader.read();
 
           done = part.done;
 
@@ -820,36 +814,44 @@ export default async function handler(req, res) {
           }
         }
 
-        if (
-          controller.signal.aborted &&
-          !res.destroyed
-        ) {
-          res.write(
-            `data: ${JSON.stringify({
-              error: {
-                message:
-                  "Время запроса истекло. Продолжи генерацию файла."
-              }
-            })}\n\n`
+        if (controller.signal.aborted) {
+          reportStreamError(
+            "Истекло время ожидания AnyModel. Полученный текст сохранён; можно продолжить ответ."
           );
         }
       } catch (e) {
-        if (!res.destroyed) {
-          res.write(
-            `data: ${JSON.stringify({
-              error: {
-                message:
-                  "Ответ прервался: " +
-                  (e.message || "ошибка потока")
-              }
-            })}\n\n`
+        if (
+          controller.signal.aborted ||
+          e?.name === "AbortError" ||
+          /operation was aborted/i.test(
+            e?.message || ""
+          )
+        ) {
+          reportStreamError(
+            "Превышено время ожидания AnyModel. Полученный текст сохранён; можно продолжить ответ."
+          );
+        } else {
+          reportStreamError(
+            "Соединение с AnyModel прервалось: " +
+              (e?.message || "ошибка сети")
           );
         }
       } finally {
-        streamPeek.reader.releaseLock();
+        clearInterval(heartbeat);
+
+        try {
+          streamPeek.reader.releaseLock();
+        } catch {}
       }
 
-      return res.end();
+      if (
+        !res.writableEnded &&
+        !res.destroyed
+      ) {
+        res.end();
+      }
+
+      return;
     }
 
     stage = "json_response";
@@ -870,7 +872,7 @@ export default async function handler(req, res) {
       : (e.status || 500);
 
     const message = timedOut
-      ? "Слишком долгий ответ модели; можно продолжить файл."
+      ? "AnyModel не завершил ответ до установленного времени ожидания. Попробуйте продолжить с сохранённого текста."
       : e.message || "Ошибка сервера.";
 
     console.error("[Venus API]", {
