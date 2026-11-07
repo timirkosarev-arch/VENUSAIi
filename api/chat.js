@@ -2,7 +2,7 @@
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 
-const API_URL = "https://anymodel.org/v1/chat/completions";
+const API_URL = "https://tooken.club/v1/chat/completions";
 const MODEL = "ds/deepseek-v4-flash-vision";
 
 const VENUS_SYSTEM_PROMPT = `
