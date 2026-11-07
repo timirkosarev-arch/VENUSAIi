@@ -4,7 +4,44 @@ import { getAuth } from "firebase-admin/auth";
 
 const API_URL = "https://anymodel.org/v1/chat/completions";
 
+// Единственная модель Venus AI
 const MODEL_DEEPSEEK = "ds/deepseek-v4-flash-vision";
+
+const VENUS_SYSTEM_PROMPT = `
+Ты Venus — инженерный и творческий помощник сайта Venus AI.
+
+СТИЛЬ И ОБЩЕНИЕ
+- Отвечай на русском, если пользователь не попросил другой язык.
+- Пиши прямо, по делу и без долгих вступлений.
+- Разбирай опечатки и фразы с ошибочной раскладкой по контексту.
+- Не переспрашивай, если запрос понятен.
+- Для короткого вопроса давай короткий ответ.
+- Для сложной задачи предоставляй подробный и законченный результат.
+- Не выдавай непроверенные догадки за факты.
+- Не утверждай, что проводил тестирование, если его не было.
+
+КОД И ПРОЕКТЫ
+- Если пользователь просит код, начинай с результата.
+- Предоставляй полноценную реализацию без заглушек, TODO и пропусков.
+- Для одного файла приводи полный код.
+- Для проекта из нескольких файлов указывай имя и содержимое каждого файла.
+- Учитывай ранее предоставленные файлы, технологии и требования.
+- При исправлении ошибки устраняй причину, сохраняя рабочий функционал.
+- Проверяй согласованность импортов, функций, переменных и обработчиков.
+- Не вставляй секретные ключи в публичные файлы.
+- Для веб-приложений создавай адаптивный интерфейс с плавными анимациями.
+- Не выдавай незавершённый проект за готовый.
+
+ФАЙЛЫ И ОТВЕТЫ
+- Используй настоящий исходный файл, когда он доступен.
+- Не выдумывай содержимое отсутствующих файлов.
+- Для кода указывай язык, имя файла и необходимые инструкции запуска.
+- Учитывай доступные изображения и документы.
+- Не заменяй практическое решение общими советами.
+- Соблюдай применимые правила безопасности.
+- Отвечай дружелюбно, профессионально и без лишнего текста.
+`;
+
 const MAX_REQUEST_TOKENS = 30000;
 const MAX_MESSAGES = 24;
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -88,9 +125,8 @@ async function authenticate(req) {
   }
 
   try {
-    return await getAuth(firebaseApp()).verifyIdToken(
-      bearer
-    );
+    return await getAuth(firebaseApp())
+      .verifyIdToken(bearer);
   } catch {
     throw error(
       401,
@@ -99,11 +135,73 @@ async function authenticate(req) {
   }
 }
 
+// Ограничение гостевых запросов
+const guestHits = new Map();
+
+const GUEST_WINDOW_MS = 60 * 60 * 1000;
+const GUEST_REQUESTS_PER_HOUR = 30;
+
+function enforceGuestLimit(req, res) {
+  const ip = String(
+    req.headers["x-vercel-forwarded-for"] ||
+    req.headers["x-forwarded-for"] ||
+    req.socket?.remoteAddress ||
+    "unknown"
+  )
+    .split(",")[0]
+    .trim()
+    .slice(0, 128);
+
+  const now = Date.now();
+
+  if (guestHits.size > 5000) {
+    for (const [key, value] of guestHits) {
+      if (now - value.start >= GUEST_WINDOW_MS) {
+        guestHits.delete(key);
+      }
+    }
+
+    if (guestHits.size > 5000) {
+      guestHits.clear();
+    }
+  }
+
+  const previous = guestHits.get(ip);
+
+  const entry =
+    !previous ||
+    now - previous.start >= GUEST_WINDOW_MS
+      ? { start: now, count: 0 }
+      : previous;
+
+  if (entry.count >= GUEST_REQUESTS_PER_HOUR) {
+    const retry = Math.max(
+      1,
+      Math.ceil(
+        (GUEST_WINDOW_MS - (now - entry.start)) / 1000
+      )
+    );
+
+    res.setHeader("Retry-After", String(retry));
+
+    throw error(
+      429,
+      "Гостевой лимит запросов исчерпан. Попробуйте позже."
+    );
+  }
+
+  entry.count += 1;
+
+  guestHits.set(ip, entry);
+}
+
 function allowedImage(url) {
-  return url.protocol === "https:" &&
+  return (
+    url.protocol === "https:" &&
     ["i.ibb.co", "i.ibb.co.com"].includes(
       url.hostname.toLowerCase()
-    );
+    )
+  );
 }
 
 async function convertImage(link, signal) {
@@ -112,10 +210,7 @@ async function convertImage(link, signal) {
   try {
     url = new URL(link);
   } catch {
-    throw error(
-      400,
-      "Некорректная ссылка на фото."
-    );
+    throw error(400, "Некорректная ссылка на фото.");
   }
 
   for (let i = 0; i < 5; i++) {
@@ -156,7 +251,10 @@ async function convertImage(link, signal) {
 
     const type = (
       res.headers.get("content-type") || ""
-    ).split(";")[0].trim().toLowerCase();
+    )
+      .split(";")[0]
+      .trim()
+      .toLowerCase();
 
     if (!IMAGE_MIME.has(type)) {
       throw error(
@@ -181,6 +279,7 @@ async function convertImage(link, signal) {
     }
 
     const reader = res.body.getReader();
+
     const chunks = [];
     let size = 0;
 
@@ -238,7 +337,9 @@ async function normalizeContent(content, signal) {
     return content;
   }
 
-  if (!Array.isArray(content)) return null;
+  if (!Array.isArray(content)) {
+    return null;
+  }
 
   const result = [];
 
@@ -326,10 +427,7 @@ async function upstreamError(res) {
 }
 
 function isQuotaFailure(status, detail) {
-  if (
-    status === 402 ||
-    status === 429
-  ) {
+  if (status === 402 || status === 429) {
     return true;
   }
 
@@ -338,7 +436,10 @@ function isQuotaFailure(status, detail) {
 }
 
 function upstreamErrorMessage(data) {
-  const item = data?.error ?? data?.message ?? data;
+  const item =
+    data?.error ??
+    data?.message ??
+    data;
 
   if (typeof item === "string") {
     return item.slice(0, 600);
@@ -348,12 +449,16 @@ function upstreamErrorMessage(data) {
     item?.message,
     item?.code,
     item?.type
-  ].filter(Boolean).join(" ").slice(0, 600) ||
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .slice(0, 600) ||
     JSON.stringify(item).slice(0, 600);
 }
 
 async function peekSse(response) {
   const reader = response.body.getReader();
+
   const pending = [];
   const decoder = new TextDecoder();
 
@@ -424,7 +529,7 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     return res.status(200).json({
       ok: true,
-      version: "venus-deepseek-only-v5"
+      version: "venus-system-prompt-v7"
     });
   }
 
@@ -454,9 +559,10 @@ export default async function handler(req, res) {
       );
     }
 
-    const body = typeof req.body === "string"
-      ? JSON.parse(req.body)
-      : req.body;
+    const body =
+      typeof req.body === "string"
+        ? JSON.parse(req.body)
+        : req.body;
 
     if (
       !body ||
@@ -469,18 +575,33 @@ export default async function handler(req, res) {
       );
     }
 
-    // Всегда используем DeepSeek.
-    // Клиент не может переключить модель.
     const model = MODEL_DEEPSEEK;
 
-    stage = "firebase_auth";
+    stage = "visitor_access";
 
-    await authenticate(req);
+    const authorization = String(
+      req.headers.authorization || ""
+    ).trim();
+
+    if (authorization) {
+      if (
+        !/^Bearer\s+\S+$/i.test(authorization)
+      ) {
+        throw error(
+          401,
+          "Неверный формат токена авторизации."
+        );
+      }
+
+      await authenticate(req);
+    } else {
+      enforceGuestLimit(req, res);
+    }
 
     if (controller.signal.aborted) {
       throw error(
         503,
-        "Время авторизации истекло."
+        "Время ожидания истекло."
       );
     }
 
@@ -496,7 +617,14 @@ export default async function handler(req, res) {
 
     stage = "normalize_messages";
 
-    const messages = [];
+    const messages = [
+      {
+        role: "system",
+        content: VENUS_SYSTEM_PROMPT
+      }
+    ];
+
+    let userStylePreferences = "";
 
     for (
       const message of body.messages.slice(-MAX_MESSAGES)
@@ -509,6 +637,15 @@ export default async function handler(req, res) {
         continue;
       }
 
+      if (message.role === "system") {
+        if (typeof message.content === "string") {
+          userStylePreferences =
+            message.content.slice(0, 6000);
+        }
+
+        continue;
+      }
+
       const content = await normalizeContent(
         message.content,
         controller.signal
@@ -516,7 +653,10 @@ export default async function handler(req, res) {
 
       if (
         content &&
-        (!Array.isArray(content) || content.length)
+        (
+          !Array.isArray(content) ||
+          content.length
+        )
       ) {
         messages.push({
           role: message.role,
@@ -525,17 +665,32 @@ export default async function handler(req, res) {
       }
     }
 
-    if (!messages.some(m => m.role === "user")) {
+    if (
+      !messages.some(m => m.role === "user")
+    ) {
       throw error(
         400,
         "Нет запроса пользователя."
       );
     }
 
+    if (
+      userStylePreferences &&
+      userStylePreferences !== VENUS_SYSTEM_PROMPT
+    ) {
+      messages.splice(1, 0, {
+        role: "user",
+        content:
+          "Дополнительные пожелания к стилю и формату ответа (если совместимы с основной инструкцией):\n" +
+          userStylePreferences
+      });
+    }
+
     const requested = Number(body.max_tokens);
 
     const maxTokens =
-      Number.isFinite(requested) && requested > 0
+      Number.isFinite(requested) &&
+      requested > 0
         ? Math.min(
             Math.floor(requested),
             MAX_REQUEST_TOKENS
@@ -571,7 +726,9 @@ export default async function handler(req, res) {
     let upstream = null;
     let streamPeek = null;
     let jsonData = null;
+
     let chosenKeyIndex = -1;
+
     let quotaMessage = "";
     let lastError = "";
 
@@ -585,7 +742,8 @@ export default async function handler(req, res) {
     ) {
       for (const tokens of budgets) {
         const headers = {
-          Authorization: `Bearer ${keys[keyIndex]}`,
+          Authorization:
+            `Bearer ${keys[keyIndex]}`,
           "Content-Type": "application/json",
           Accept: stream
             ? "text/event-stream"
@@ -605,7 +763,8 @@ export default async function handler(req, res) {
         });
 
         if (!upstream.ok) {
-          lastError = await upstreamError(upstream);
+          lastError =
+            await upstreamError(upstream);
 
           if (
             isQuotaFailure(
@@ -683,7 +842,10 @@ export default async function handler(req, res) {
               upstreamErrorMessage(jsonData);
 
             if (
-              isQuotaFailure(200, reason)
+              isQuotaFailure(
+                200,
+                reason
+              )
             ) {
               quotaMessage = reason;
 
@@ -693,6 +855,7 @@ export default async function handler(req, res) {
               );
 
               jsonData = null;
+
               continue keyLoop;
             }
 
@@ -704,6 +867,7 @@ export default async function handler(req, res) {
         }
 
         chosenKeyIndex = keyIndex;
+
         break keyLoop;
       }
 
@@ -721,7 +885,7 @@ export default async function handler(req, res) {
         throw error(
           429,
           keys.length === 1
-            ? "Баланс или квота основного API закончились. Добавь API_KEY_2 в Vercel."
+            ? "Баланс или квота основного AnyModel API закончились. Добавь API_KEY_2 в Vercel."
             : "Баланс или квота закончились на обоих API-ключах AnyModel."
         );
       }
@@ -729,7 +893,8 @@ export default async function handler(req, res) {
       throw error(
         502,
         `AnyModel: ${
-          lastError || "не удалось получить ответ"
+          lastError ||
+          "не удалось получить ответ"
         }`
       );
     }
@@ -752,12 +917,17 @@ export default async function handler(req, res) {
       res.writeHead(200, {
         "Content-Type":
           "text/event-stream; charset=utf-8",
-        "Cache-Control": "no-cache, no-transform",
-        "X-Accel-Buffering": "no"
+        "Cache-Control":
+          "no-cache, no-transform",
+        "X-Accel-Buffering":
+          "no"
       });
 
       const heartbeat = setInterval(() => {
-        if (!res.destroyed && !res.writableEnded) {
+        if (
+          !res.destroyed &&
+          !res.writableEnded
+        ) {
           res.write(": venus-ping\n\n");
         }
       }, 15000);
