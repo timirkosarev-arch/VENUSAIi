@@ -258,84 +258,18 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
 
 
-/* Click-to-open code artifacts */
-.artifact-card{margin:13px 0 17px;max-width:100%;width:min(100%,620px)}
-.artifact-tile{width:100%;border:1px solid var(--line);background:var(--card);border-radius:16px;padding:15px 16px;text-align:left;color:var(--text);display:flex;align-items:center;gap:14px;box-shadow:0 3px 12px rgba(0,0,0,.025);transition:transform .16s,box-shadow .16s,border-color .16s}
-.artifact-tile:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
-.artifact-symbol{width:43px;height:43px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,#f2ebff,#e4d8ff);color:#6749ad;flex-shrink:0}
-:root[data-theme="dark"] .artifact-symbol{background:#362b45;color:#ddc9ff}
-.artifact-symbol svg{width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-.artifact-info{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
-.artifact-info strong{font-size:13.5px;font-weight:700;line-height:1.4;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.artifact-info small{font-size:11px;color:var(--muted);line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.artifact-arrow{font-size:20px;color:var(--muted);padding:0 3px;transition:transform .16s}
-.artifact-tile:hover .artifact-arrow{transform:translateX(3px);color:var(--accent)}
-.artifact-modal{z-index:85;padding:clamp(8px,2vw,22px)}
-.artifact-dialog{width:min(1100px,100%);height:min(88dvh,850px);background:var(--bg);color:var(--text);border-radius:20px;border:1px solid var(--line);box-shadow:0 24px 95px rgba(0,0,0,.25);display:flex;flex-direction:column;min-height:0;overflow:hidden}
-.artifact-dialog-header{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line);flex-shrink:0}
-.artifact-dialog-avatar{width:35px;height:35px;border-radius:10px;background:var(--ava) center/cover no-repeat;flex-shrink:0}
-.artifact-dialog-heading{display:flex;flex-direction:column;gap:0;min-width:0;flex:1}
-.artifact-dialog-heading strong{font-size:14px;font-weight:725;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.artifact-dialog-heading small{font-size:11px;color:var(--muted)}
-.artifact-icon-btn{border:1px solid var(--line);background:var(--panel);border-radius:10px;min-height:37px;padding:6px 11px;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;font-size:12px;font-weight:650;transition:background .15s,border-color .15s}
-.artifact-icon-btn:hover{background:var(--hover);border-color:var(--accent)}
-.artifact-icon-btn img{width:17px;height:17px;object-fit:contain;flex-shrink:0}
-:root[data-theme="dark"] .artifact-icon-btn img{filter:invert(1)}
-.artifact-close{width:37px;height:37px;display:grid;place-items:center;border:0;border-radius:10px;background:transparent;font-size:24px;line-height:1;color:var(--muted)}
-.artifact-close:hover{background:var(--hover);color:var(--text)}
-.artifact-codebar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 18px;background:var(--panel2);border-bottom:1px solid var(--line);font-size:11px;color:var(--muted)}
-.artifact-codebar strong{font-weight:700;color:var(--text)}
-.artifact-codebar span{font-variant-numeric:tabular-nums}
-.artifact-codearea{flex:1;min-height:0;overflow:auto;background:var(--soft)}
-.artifact-codearea pre{margin:0;padding:24px 24px 34px;min-width:max-content;tab-size:2;font:13px/1.75 ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;white-space:pre;color:var(--text)}
-.artifact-codearea code{font:inherit}
-.artifact-dialog-footer{flex-shrink:0;border-top:1px solid var(--line);padding:10px 18px;background:var(--panel);display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--muted);font-size:11px}
-.artifact-commands{display:flex;align-items:center;gap:8px}
-@media(max-width:680px){
-  .artifact-modal{padding:0}
-  .artifact-dialog{height:100dvh;width:100%;border-radius:0;border:0}
-  .artifact-dialog-header{padding:12px 12px;gap:8px}
-  .artifact-dialog-avatar{width:31px;height:31px}
-  .artifact-codearea pre{padding:16px 14px 24px;font-size:12px;line-height:1.65}
-  .artifact-icon-btn{min-height:35px;padding:6px 8px;gap:5px;font-size:11px}
-  .artifact-icon-btn img{width:15px;height:15px}
-  .artifact-dialog-footer{padding:10px 12px}
-  .artifact-codebar{padding:7px 13px}
-}
-
-
-/* Show the true state of streamed / unfinished code, rather than silently treating it as complete. */
-.artifact-warning{font-size:12px;line-height:1.5;padding:10px 16px;color:#a45d13;background:#fff4dc;border-bottom:1px solid #f3d49c}
-:root[data-theme="dark"] .artifact-warning{background:#3d311b;color:#ffe1a5;border-color:#64502d}
-.artifact-incomplete .artifact-tile{border-color:#cf9e58}
-.artifact-incomplete .artifact-info small{color:#ac741e}
-:root[data-theme="dark"] .artifact-incomplete .artifact-info small{color:#f0c17b}
-.response-incomplete{font-size:12px;line-height:1.5;color:#a45d13;margin:10px 0;border:1px solid #e4c28d;border-radius:9px;padding:8px 10px}
-:root[data-theme="dark"] .response-incomplete{color:#f0c17b;border-color:#644c2b}
-
-
-/* Dedicated code-to-file workflow */
-.code-mode{display:inline-flex;gap:6px;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:999px;padding:7px 11px;background:transparent;color:var(--muted);font-size:11.5px;font-weight:640;min-height:33px;white-space:nowrap;transition:background .16s,border-color .16s}
-.code-mode .ui-icon{width:16px;height:16px}
-.code-mode:hover{background:var(--hover);color:var(--text)}
-.code-mode[aria-pressed="true"]{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 48%,var(--line));background:color-mix(in srgb,var(--accent) 9%,var(--panel))}
-.code-build{border:1px solid var(--line);border-radius:16px;padding:15px 17px;max-width:440px;width:min(440px,calc(100vw - 95px));background:var(--panel);box-shadow:var(--shadow)}
-.code-build-head{display:flex;align-items:center;gap:10px;font-weight:700;font-size:13px;margin-bottom:11px}
-.code-build-head .ui-icon{color:var(--accent);width:18px;height:18px}
-.code-build-steps{display:grid;gap:9px}
-.code-build-step{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:12px}
-.code-build-step .indicator{width:17px;height:17px;display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;font-size:10px;flex-shrink:0}
-.code-build-step.active{color:var(--text);font-weight:650}
-.code-build-step.active .indicator{background:var(--accent);border-color:var(--accent);color:#fff;animation:codePulse 1.1s infinite alternate}
-.code-build-step.done .indicator{background:color-mix(in srgb,var(--accent) 12%,var(--panel));color:var(--accent);border-color:transparent}
-.code-build-detail{margin-top:11px;color:var(--muted);font-size:11px;line-height:1.5;overflow-wrap:anywhere}
-.code-draft-private{padding:15px 16px;border-radius:14px;border:1px solid var(--line);background:var(--panel);color:var(--text);font-size:13px;line-height:1.6}
-.code-draft-private strong{display:block;font-size:13px;margin-bottom:5px}
-.code-draft-private small{display:block;color:var(--muted);font-size:11px}
-@keyframes codePulse{from{opacity:.55}to{opacity:1}}
-.code-build-result{margin:8px 0 0;border-radius:10px;background:color-mix(in srgb,var(--accent) 7%,var(--panel));padding:8px 11px;font-size:11.5px;color:var(--accent)}
-.message-actions [data-download-project]{color:var(--accent);font-weight:710;border:1px solid color-mix(in srgb,var(--accent) 30%,var(--line));padding:6px 10px;background:color-mix(in srgb,var(--accent) 7%,var(--bg))}
-@media(max-width:600px){.attach-caption{display:none}.composer-left{gap:7px}.code-mode{font-size:11px;padding:6px 9px}.code-mode .ui-icon{width:14px;height:14px}}
+/* The code appears directly in chat. No artifacts or hidden generation. */
+.code-mode[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 9%,var(--panel))}
+.pre{contain:layout style;box-shadow:0 2px 12px rgba(0,0,0,.035)}
+.pre .h{min-height:37px;flex-wrap:wrap;font-family:inherit;font-weight:600}
+.pre .h .code-actions{margin-left:auto}
+.pre .h button{font-family:inherit;font-size:11.5px;font-weight:650;border:1px solid var(--line);background:var(--panel);padding:5px 9px;cursor:pointer}
+.pre pre{white-space:pre;tab-size:2;line-height:1.58;max-height:75vh;overflow:auto;overscroll-behavior:contain}
+.pre code{white-space:pre;display:block;min-width:max-content}
+.pre[data-incomplete="true"] code::after{content:"";display:inline-block;vertical-align:-2px;width:2px;height:1.05em;margin-left:2px;background:var(--accent);animation:venusCaret .8s steps(1) infinite}
+@keyframes venusCaret{50%{opacity:0}}
+.streaming-reply{min-height:24px}
+@media(max-width:600px){.pre pre{padding:10px 12px;font-size:11.5px;max-height:70vh}.pre .h{padding:7px 9px}}
 
 /* Token usage meter */
 .token-meter {display:flex;align-items:center;gap:6px;padding:6px 11px;border:1px solid var(--line);border-radius:999px;font-size:12px;white-space:nowrap;color:var(--muted);background:var(--panel)}
@@ -483,7 +417,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
       <div class="composer-left">
         <button class="attach" id="attachBtn" type="button" title="Прикрепить файл" aria-label="Прикрепить файл"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.4 11.6-8.8 8.8a6 6 0 0 1-8.5-8.5l9.9-9.9a4 4 0 0 1 5.7 5.7l-9.9 9.9a2 2 0 0 1-2.8-2.8l8.5-8.5"/></svg></button>
         <span class="attach-caption">Фото и файлы</span>
-        <button class="code-mode" id="codeModeBtn" type="button" aria-pressed="false" title="Включить создание файлов с предварительным планом"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M14 4l-4 16"/></svg><span>Код → файл</span></button>
+        <button class="code-mode" id="codeModeBtn" type="button" aria-pressed="false" title="Генерировать код прямо в чате"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M14 4l-4 16"/></svg><span>Режим кода</span></button>
       </div>
       <input id="fileInput" type="file" hidden multiple accept="image/*,.pdf,.txt,.md,.json,.csv,.html,.htm,.css,.js,.mjs,.ts,.tsx,.jsx,.py,.lua,.java,.c,.cpp,.h,.cs,.go,.rs,.sql,.xml,.yaml,.yml,.toml,.ini,.log,.sh,.docx,.xlsx" />
       <button class="send" id="send" type="button" disabled aria-label="Отправить сообщение"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
@@ -557,26 +491,6 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
   </div>
 </div>
 
-
-<!-- ARTIFACT CODE VIEWER -->
-<div class="mod artifact-modal" id="artifactModal" role="dialog" aria-modal="true" aria-labelledby="artifactTitle" aria-hidden="true">
-  <section class="artifact-dialog" aria-label="Просмотр кода артефакта">
-    <header class="artifact-dialog-header">
-      <div class="artifact-dialog-avatar" aria-hidden="true"></div>
-      <div class="artifact-dialog-heading">
-        <strong id="artifactTitle">Код артефакта</strong>
-        <small>Venus AI · Артефакт</small>
-      </div>
-      <button class="artifact-icon-btn" id="artifactCopy" type="button" title="Копировать код" aria-label="Копировать код"><img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQweRuCM4SuAbWZAy2HfqbnoCDDpvggKy1-PK7zdaGr3g&amp;s=10" alt=""><span id="artifactCopyLabel">Копировать</span></button>
-      <button class="artifact-icon-btn" id="artifactDownload" type="button" title="Скачать файл" aria-label="Скачать файл"><img src="https://cdn-icons-png.flaticon.com/512/54/54993.png" alt=""><span>Скачать</span></button>
-      <button class="artifact-close" id="artifactClose" type="button" title="Закрыть" aria-label="Закрыть">×</button>
-    </header>
-    <div class="artifact-codebar"><strong id="artifactLanguage">Код</strong><span id="artifactStats">0 строк</span></div>
-    <div class="artifact-warning" id="artifactWarning" hidden>Генерация этого файла ещё продолжается. Вернитесь в чат и нажмите «Продолжить генерацию».</div>
-    <div class="artifact-codearea"><pre><code id="artifactCode"></code></pre></div>
-    <footer class="artifact-dialog-footer"><span>Код можно копировать и сохранять в файл</span><span id="artifactFilename">code.txt</span></footer>
-  </section>
-</div>
 
 <!-- FIREBASE + APP -->
 
@@ -1138,8 +1052,8 @@ $("codeModeBtn").onclick=()=>{
   manualCodeMode=!manualCodeMode;
   $("codeModeBtn").setAttribute("aria-pressed", String(manualCodeMode));
   $("codeModeBtn").title=manualCodeMode
-    ? "Режим файлов включён. Нажмите, чтобы выключить"
-    : "Включить создание файлов с предварительным планом";
+    ? "Режим кода включён: исходники будут писаться прямо в чате"
+    : "Включить генерацию полного кода прямо в чате";
 };
 
 /* MODEL SELECTION */
@@ -1325,16 +1239,16 @@ function md(t,forceIncomplete=false) {
     const code=block.c; // retain every character and trailing newline
     const complete=block.complete && !forceIncomplete && isValidCodeBlock(block);
     const lines=code ? code.split("\n").length : 0;
-    const sample=(code.split("\n").find(line=>line.trim())||"Нажмите, чтобы открыть код").trim().slice(0,72);
-    return `
-      <div class="artifact-card ${complete?"":"artifact-incomplete"}" data-artifact-complete="${complete}" data-artifact-lang="${esc(language)}" data-artifact-filename="${esc(fileName)}">
-        <button class="artifact-tile" type="button" data-open-artifact aria-label="Открыть артефакт ${esc(fileName)}">
-          <span class="artifact-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9l-6-6H8Z"/><path d="M14 3v6h7M9 13l-3 3 3 3m6-6 3 3-3 3"/></svg></span>
-          <span class="artifact-info"><strong>${esc(fileName)}</strong><small>${esc(language.toUpperCase())} · ${lines} строк · ${complete?esc(sample):"Не завершён"}</small></span>
-          <span class="artifact-arrow" aria-hidden="true">↗</span>
-        </button>
-        <pre class="artifact-source" hidden><code>${esc(code)}</code></pre>
-      </div>`;
+    return `<div class="pre" data-incomplete="${!complete}" data-filename="${esc(fileName)}">
+      <div class="h">
+        <span>${esc(fileName)}${complete?"":" · печатает…"}</span>
+        <div class="code-actions">
+          <button type="button" data-copy title="Копировать исходный код">Копировать</button>
+          <button type="button" data-download-code data-filename="${esc(fileName)}" data-lang="${esc(language)}" title="Скачать файл с кодом">Скачать</button>
+        </div>
+      </div>
+      <pre><code>${esc(code)}</code></pre>
+    </div>`;
   });
 
 }
@@ -1450,21 +1364,15 @@ function msgHTML(m,index) {
     <div class="row">
       <div class="av"></div>
       <div class="bub">
-        ${m.codeBuild && (m.truncated || m.resuming)
-          ? `<div class="code-draft-private"><strong>${m.resuming?"Создание исходных файлов":m.content?"Генерация частично выполнена":"Не удалось получить код"}</strong><small>${m.content?`Код скрыт · ≈${estimateOutputTokens(m.content).toLocaleString("ru-RU")} токенов · ${countCodeLines(m.content).toLocaleString("ru-RU")} строк. `:"Модель пока не прислала ни одной строки кода. "}${m.resuming?"Получаю настоящий ответ API.":"Повторить можно вручную."}</small></div>`
-          : (m.content ? md(m.content, !!m.truncated && !m.codeBuild) : "")}
-        ${!m.codeBuild && m.error ? `<div class="err" role="alert">${esc(m.error)}</div>` : ""}
-        ${m.codeBuild && m.resuming ? '<div class="code-build-result">Дополняю код и проверяю результат…</div>' : ''}
-        ${m.truncated && m.codeBuild && !m.resuming ? `<div class="code-build-result">${m.tokenBudgetHit ? "Достигнут предел 30 000 токенов для одного проекта." : m.content ? "Полученные строки сохранены." : "Готовых файлов пока нет."}${m.resumeError ? " Причина: " + esc(m.resumeError) : ""}</div>` : ''}
-        ${m.truncated && !m.codeBuild ? '<div class="code-build-result">Ответ прервался. Попробуйте повторить запрос.</div>' : ''}
-        ${m.codeBuild && m.projectState?.finished && !m.truncated && inspectCodeFiles(m.content).files.length ? '<div class="code-build-result">Файлы сформированы. Откройте артефакт или скачайте проект. Проверка запуска выполняется отдельно.</div>' : ''}
+        ${m.content ? md(m.content) : ""}
+        ${m.error ? `<div class="err" role="alert">${esc(m.error)}</div>` : ""}
+        ${m.resumeError && !m.error ? `<div class="err" role="alert">${esc(m.resumeError)}</div>` : ""}
+        ${m.truncated && m.content ? '<div class="code-build-result">Ответ не завершён. Напиши «Продолжи код», чтобы получить следующую часть.</div>' : ""}
         <div class="message-actions">
-          ${m.codeBuild && m.truncated && !m.resuming ? `<button data-resume-code data-index="${index}" type="button">${m.tokenBudgetHit ? "Сделать компактную версию" : "Продолжить генерацию"}</button>` : ''}
-          ${m.codeBuild && !m.truncated && inspectCodeFiles(m.content).files.length ? `<button data-download-project data-index="${index}" type="button">${inspectCodeFiles(m.content).files.length===1?"Скачать файл":"Скачать проект ZIP"}</button>` : ''}
-          <button data-copy-answer data-index="${index}">Копировать</button>
+          <button data-copy-answer data-index="${index}">Копировать ответ</button>
           <button data-share-answer data-index="${index}">Поделиться</button>
           <button data-download-answer data-index="${index}">Скачать .md</button>
-          <button data-retry data-index="${index}">Попробовать снова</button>
+          <button data-retry data-index="${index}">Повторить</button>
         </div>
       </div>
     </div>
@@ -1854,7 +1762,7 @@ function renderLineUsage(liveDraft="") {
     total+(message.role==="assistant"?countCodeLines(message.content):0),0);
   const count=saved+countCodeLines(liveDraft);
   el.textContent=count.toLocaleString("ru-RU")+" "+(count%10===1&&count%100!==11?"строка":([2,3,4].includes(count%10) && !(count%100>=12&&count%100<=14)?"строки":"строк"));
-  $("lineMeter").title="Строки кода в ответах текущего чата: "+count.toLocaleString("ru-RU")+". Входят незавершённые артефакты. Текст вне блоков кода не учитывается.";
+  $("lineMeter").title="Строки кода в ответах текущего чата: "+count.toLocaleString("ru-RU")+". Текст вне блоков кода не учитывается.";
 }
 
 function estimateUsageTokens(content) {
@@ -2617,18 +2525,19 @@ async function send(text,attachmentsOverride=null) {
     c={id:Date.now(),title:(text||selected[0]?.name||"Новый чат").slice(0,40),messages:[]};
     currentChats.unshift(c);cur=c.id;
   }
-  const codeBuild=shouldCreateFiles(text,c);
+  const wantsCode=manualCodeMode || shouldCreateFiles(text,c);
+  const codeBuild=false; // Always stream visible Markdown and fenced code directly.
   c.messages.push({role:"user",content:text,attachments:selected.map(a=>({
     mediaId:a.mediaId,name:a.name,type:a.type,kind:a.kind,remoteUrl:a.remoteUrl||""
   }))});
   if(attachmentsOverride===null) {pendingAttachments=[];renderPendingAttachments();}
   $("inp").value="";grow();saveChats();renderList();renderMsgs();
-  const am={role:"assistant",content:"",codeBuild,truncated:codeBuild,resuming:codeBuild};
+  const am={role:"assistant",content:"",codeBuild:false,truncated:false,resuming:false};
   // Persist the assistant turn before requesting the API. Otherwise an error
   // removes the temporary loading bubble and leaves a completely blank chat.
   c.messages.push(am);
   saveChats();
-  const liveHtml=codeBuild?codeBuildHtml(0,"Подготавливаю исходные файлы…"):'<div class="dots"><i></i><i></i><i></i></div>';
+  const liveHtml='<div class="dots"><i></i><i></i><i></i></div>';
   $("wrap").insertAdjacentHTML("beforeend",`<div class="row" id="live"><div class="av"></div><div class="bub">${liveHtml}</div></div>`);
   const live=()=>$("live")?.lastElementChild;
   const progress=(stage,detail="")=>{
@@ -2639,40 +2548,75 @@ async function send(text,attachmentsOverride=null) {
   try {
     const headers={"Content-Type":"application/json", "Authorization":`Bearer ${await auth.currentUser.getIdToken()}`};
     const model=$("modelSelect").value;
-    if(codeBuild) {
-      am.projectState={task:text,model,files:[],requests:0,finished:false,lastError:""};
-      await buildRealProject(c,am,headers,ctrl.signal,progress);
-      if(!am.content.trim())throw new Error(
-        am.projectState.lastError || "AnyModel не прислал содержимое файла. Проверь доступность выбранной модели и настройки API_KEY."
-      );
-    } else {
-      const messages=await buildApiMessages(c);
-      const response=await fetchNormalChat(
-        {model,messages,stream:true,max_tokens:4096},
-        headers,ctrl.signal
-      );
-      if(!response.ok) {
-        const raw=await response.text();let detail=raw;
-        try {const obj=JSON.parse(raw);detail=obj.error?.message||obj.error||raw;}catch{}
-        throw new Error(`Ошибка ${response.status}: ${String(detail).slice(0,400)}`);
-      }
-      let output="";
-      const result=await readVenusResponse(response,piece=>{
-        output+=piece;
-        am.content=output; // Keep every received fragment even if the stream breaks.
-        const el=live();if(el)el.innerHTML=md(output);
-        $("msgs").scrollTop=$("msgs").scrollHeight;
-      });
-      addTokenUsage(result.usage,messages,output);
-      if(!output.trim()) {
-        const fallback=await requestVenusOnce(messages,model,headers,ctrl.signal,2048);
-        output=fallback.text;
-      }
-      if(!output.trim())throw new Error("Модель не прислала видимого текста. Проверь выбранную модель, API-ключ и логи Vercel.");
-      am.content=output;
-      am.error="";
-      am.truncated=result.finishReason==="length" || !!result.interrupted;
+    const messages=await buildApiMessages(c);
+    if(wantsCode) {
+      const inlineCodeInstruction=`Пользователь хочет рабочий программный код. Начинай сразу с реализации. Выводи полный исходный код прямо в ответе Markdown-блоками с языком, с указанием "Файл: имя.ext" перед каждым файлом. Не используй артефакты, скрытые черновики, этапы подготовки, TODO, заглушки или "остальной код без изменений". Не проси исходный файл, если он уже есть во вложениях или истории. Если код слишком длинный для одного ответа, допиши максимально цельную часть и предложи продолжение. Не заявляй, что тестировал без реального теста.`;
+      if(messages[0]?.role==="system")messages[0].content+="\n\n"+inlineCodeInstruction;
+      else messages.unshift({role:"system",content:inlineCodeInstruction});
     }
+    const response=await fetchNormalChat(
+      {model,messages,stream:true,max_tokens:wantsCode?12000:4096},
+      headers,ctrl.signal
+    );
+    if(!response.ok) {
+      const raw=await response.text();let detail=raw;
+      try {const obj=JSON.parse(raw);detail=obj.error?.message||obj.error||raw;}catch{}
+      throw new Error(`Ошибка ${response.status}: ${String(detail).slice(0,400)}`);
+    }
+    let output="";
+    let paintScheduled=false;
+    let previewTimer=null;
+    beginLiveTokenPreview();
+    const paint=()=>{
+      paintScheduled=false;
+      const el=live();
+      if(!el)return;
+      const scroll=$('msgs');
+      const wasAtBottom=scroll.scrollHeight-scroll.scrollTop-scroll.clientHeight<180;
+      el.innerHTML=md(output);
+      updateLiveTokenPreview(output);
+      renderLineUsage();
+      if(wasAtBottom)scroll.scrollTop=scroll.scrollHeight;
+    };
+    const schedulePaint=()=>{
+      if(paintScheduled)return;
+      paintScheduled=true;
+      // Coalesces many tiny SSE packets so the code appears smoothly and
+      // the browser does not rebuild a large code block on every token.
+      previewTimer=setTimeout(paint,72);
+    };
+    let result;
+    try {
+      result=await readVenusResponse(response,piece=>{
+        output+=piece;
+        am.content=output;
+        schedulePaint();
+      });
+      if(previewTimer!==null)clearTimeout(previewTimer);
+      paint();
+    } catch(streamError) {
+      if(previewTimer!==null)clearTimeout(previewTimer);
+      if(output.trim()) {
+        am.content=output;
+        am.truncated=true;
+        am.error=`Поток ответа прервался: ${String(streamError.message||streamError)}. Полученный код сохранён.`;
+        addTokenUsage(null,messages,output);
+        paint();
+        return;
+      }
+      throw streamError;
+    }
+    addTokenUsage(result.usage,messages,output);
+    if(!output.trim()) {
+      const fallback=await requestVenusOnce(messages,model,headers,ctrl.signal,2048);
+      output=fallback.text;
+      am.content=output;
+      paint();
+    }
+    if(!output.trim())throw new Error("Модель не прислала текст. Проверь ID модели и логи Vercel.");
+    am.content=output;
+    am.error="";
+    am.truncated=result.finishReason==="length" || !!result.interrupted;
   } catch(e) {
     if(e.name!=="AbortError") {
       const hint=e.message==="Failed to fetch"?"Не удалось подключиться к API.":String(e.message||e);
@@ -3098,86 +3042,12 @@ function saveGeneratedFiles(files) {
   setTimeout(()=>URL.revokeObjectURL(url),2000);
 }
 
-let openedArtifact=null;
-let artifactReturnFocus=null;
-
-function openArtifact(card) {
-  const raw=card.querySelector(".artifact-source code");
-  if(!raw) return;
-  const code=raw.textContent||"";
-  const language=card.dataset.artifactLang||"text";
-  const filename=card.dataset.artifactFilename||`venus-code.${extensionForLanguage(language)}`;
-  const complete=card.dataset.artifactComplete!=="false";
-  openedArtifact={code,language,filename,complete};
-  $("artifactWarning").hidden=complete;
-  $("artifactDownload").disabled=!complete;
-  $("artifactDownload").title=complete?"Скачать готовый файл":"Файл не завершён";
-  artifactReturnFocus=document.activeElement;
-  $("artifactCode").textContent=code;
-  $("artifactTitle").textContent=filename;
-  $("artifactFilename").textContent=filename;
-  $("artifactLanguage").textContent=language.toUpperCase();
-  const lines=code ? code.split("\n").length : 0;
-  $("artifactStats").textContent=`${lines} строк · ${formatBytes(new Blob([code]).size)}${complete?"":" · НЕ ЗАВЕРШЁН"}`;
-  $("artifactCopyLabel").textContent="Копировать";
-  $("artifactModal").classList.add("on");
-  $("artifactModal").setAttribute("aria-hidden","false");
-  $("artifactClose").focus();
-}
-
-function closeArtifact() {
-  $("artifactModal").classList.remove("on");
-  $("artifactModal").setAttribute("aria-hidden","true");
-  openedArtifact=null;
-  artifactReturnFocus?.focus?.();
-  artifactReturnFocus=null;
-}
-
-$("artifactClose").onclick=closeArtifact;
-$("artifactModal").addEventListener("click",e=>{
-  if(e.target===$("artifactModal")) closeArtifact();
-});
-document.addEventListener("keydown",e=>{
-  if(e.key==="Escape" && $("artifactModal").classList.contains("on")) {
-    e.preventDefault();
-    closeArtifact();
-  }
-});
-
-$("artifactCopy").onclick=async()=>{
-  if(!openedArtifact) return;
-  try {
-    await navigator.clipboard.writeText(openedArtifact.code);
-    $("artifactCopyLabel").textContent="Скопировано";
-    setTimeout(()=>{if($("artifactCopyLabel")) $("artifactCopyLabel").textContent="Копировать";},1500);
-  } catch(error) {
-    // Clipboard can be unavailable in insecure origins: show selected text.
-    const selection=window.getSelection();
-    const range=document.createRange();
-    range.selectNodeContents($("artifactCode"));
-    selection.removeAllRanges();
-    selection.addRange(range);
-    alert("Выделил код — скопируйте его вручную.");
-  }
-};
-
-$("artifactDownload").onclick=()=>{
-  if(!openedArtifact || !openedArtifact.complete) return;
-  downloadBlob(openedArtifact.code,openedArtifact.filename,"text/plain;charset=utf-8");
-};
-
 /* MESSAGE ACTIONS, CODE EXPORTS AND SUGGESTIONS */
 
 $("wrap").addEventListener("click",async e=>{
   const suggestion=e.target.closest("[data-s]");
   if(suggestion) {
     send(suggestion.dataset.s);
-    return;
-  }
-
-  const artifactButton=e.target.closest("[data-open-artifact]");
-  if(artifactButton) {
-    openArtifact(artifactButton.closest(".artifact-card"));
     return;
   }
 
@@ -3196,8 +3066,8 @@ $("wrap").addEventListener("click",async e=>{
   if(downloadCode) {
     const code=downloadCode.closest(".pre").querySelector("code").textContent;
     const lang=(downloadCode.dataset.lang||"txt").toLowerCase();
-    const ext=extensionForLanguage(lang);
-    downloadBlob(code,`venus-ai-code.${ext}`,"text/plain;charset=utf-8");
+    const filename=safeCodeFilename(downloadCode.dataset.filename)||`venus-ai-code.${extensionForLanguage(lang)}`;
+    downloadBlob(code,filename,"text/plain;charset=utf-8");
     return;
   }
 
@@ -3206,19 +3076,6 @@ $("wrap").addEventListener("click",async e=>{
   if(!c || !Number.isInteger(index))return;
   const message=c.messages[index];
   if(!message || message.role!=="assistant")return;
-
-  if(e.target.closest("[data-resume-code]")) {
-    await resumeIncompleteCode(index);
-    return;
-  }
-
-  if(e.target.closest("[data-download-project]")) {
-    if(message.truncated) { alert("Этот код ещё не завершён. Скачивание полного проекта недоступно.");return; }
-    const parsed=inspectCodeFiles(message.content);
-    if(parsed.issues.length) { alert("В файлах найдена проблема: "+parsed.issues.join("; "));return; }
-    saveGeneratedFiles(parsed.files);
-    return;
-  }
 
   if(e.target.closest("[data-copy-answer]")) {
     try {
