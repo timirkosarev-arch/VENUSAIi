@@ -422,7 +422,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
   <aside class="side" id="side">
   <div class="brand"><div class="logo"></div><span>Venus AI</span><em>STUDIO</em></div>
   <button class="new" id="newBtn" type="button"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L10 16l-4 1 1-4Z"/><path d="M4 4h7M4 4v16h16v-7"/></svg><span class="new-label">Новый чат</span></button>
-  <button class="new pro-upgrade" id="upgradeBtn" type="button"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3ZM19 17l.7 2.3L22 20l-2.3.7L19 23l-.7-2.3L16 20l2.3-.7L19 17Z"/></svg><span id="upgradeText">Перейти на Pro</span></button>
+  <button class="new pro-upgrade" id="upgradeBtn" type="button" style="display:none" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3ZM19 17l.7 2.3L22 20l-2.3.7L19 23l-.7-2.3L16 20l2.3-.7L19 17Z"/></svg><span id="upgradeText">Перейти на Pro</span></button>
   <div class="sidebar-subtitle">История чатов</div>
   <div class="list" id="list"></div>
   <div class="foot">
@@ -457,9 +457,8 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
     <span id="lineCount">0 строк</span>
   </div>
   <select class="model-select" id="modelSelect" title="Модель Venus AI" aria-label="Выбрать модель">
-    <option value="cx/gpt-6-luna">Flash</option>
-    <option value="cx/gpt-6-sol">High</option>
-    <option id="proModelOption" value="cc/claude-opus-5-5" hidden>Pro High — Claude Opus 5.5</option>
+    <option value="cc/claude-haiku-5-5">Flash — Claude Haiku 5.5</option>
+    <option value="cc/claude-sonnet-5-5">High — Claude Sonnet 5.5</option>
   </select>
   <div class="top-right">
     <button class="top-new" id="topNewBtn" type="button" title="Новый чат" aria-label="Новый чат"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L10 16l-4 1 1-4Z"/><path d="M4 4h7M4 4v16h16v-7"/></svg></button>
@@ -523,7 +522,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
   <div class="card pro-card">
     <div class="pro-kicker">VENUS AI PRO</div>
     <h2>Claude Opus 5.5</h2>
-    <p class="pro-description">Доступ к модели Pro High на 30 дней.</p>
+    <p class="pro-description">Временно доступны только Flash и High.</p>
     <div class="pro-price-line">
       <span class="old-price">$20</span>
       <span class="new-price">$10</span>
@@ -664,9 +663,8 @@ const DEFAULT_SYS = `Ты Venus AI — сильный и практичный И
 - При неоднозначностях выбирай разумные настройки самостоятельно; задавай вопрос только при реальной необходимости.`;
 
 const MODELS = {
-  flash: "cx/gpt-6-luna",
-  high: "cx/gpt-6-sol",
-  pro: "cc/claude-opus-5-5"
+  flash: "cc/claude-haiku-5-5",
+  high: "cc/claude-sonnet-5-5"
 };
 
 const ADMIN_EMAIL = "flexadssq@gmail.com";
@@ -738,11 +736,6 @@ function refreshProCountdown() {
   const grant = getActiveProGrant(currentUser?.email);
   if (!grant) {
     $("proStatus").hidden = true;
-    $("proModelOption").hidden = true;
-    if ($("modelSelect").value === MODELS.pro) {
-      $("modelSelect").value = MODELS.flash;
-      if (currentUser?.uid) store.set(modelKey(currentUser.uid), MODELS.flash);
-    }
     return false;
   }
   $("proCountdown").textContent = formatProRemaining(Number(grant.expiresAt) - Date.now());
@@ -754,13 +747,8 @@ function refreshProUI() {
   const grant = getActiveProGrant(currentUser?.email);
   const hasPro = !!grant;
   $("adminBtn").hidden = !isAdmin;
-  $("proModelOption").hidden = !hasPro;
   $("proStatus").hidden = !hasPro;
   $("upgradeText").textContent = hasPro ? "Pro — подписка активна" : "Перейти на Pro";
-  if (!hasPro && $("modelSelect").value === MODELS.pro) {
-    $("modelSelect").value = MODELS.flash;
-    if (currentUser?.uid) store.set(modelKey(currentUser.uid), MODELS.flash);
-  }
   if (hasPro) refreshProCountdown();
 }
 
@@ -1104,7 +1092,9 @@ onAuthStateChanged(auth,user => {
   if (!savedSystem || savedSystem === LEGACY_DEFAULT_SYS) saveSystem();
 
   const savedModel = store.get(modelKey(settingsId),MODELS.flash);
-  const selectedModel = savedModel === "cx/gpt-6-astra" ? MODELS.pro : savedModel;
+  const selectedModel = ["cx/gpt-6-astra", "cc/claude-opus-5-5", "cx/gpt-6-sol", "cx/gpt-6.1-sol"].includes(savedModel)
+    ? MODELS.high
+    : ["cx/gpt-6-luna"].includes(savedModel) ? MODELS.flash : savedModel;
   $("modelSelect").value = ALL_MODEL_VALUES.has(selectedModel)
     ? selectedModel
     : MODELS.flash;
@@ -1154,11 +1144,6 @@ $("codeModeBtn").onclick=()=>{
 
 $("modelSelect").addEventListener("change",() => {
   if (!currentUser) return;
-  if ($("modelSelect").value === MODELS.pro && !hasActivePro(currentUser.email)) {
-    $("modelSelect").value = MODELS.flash;
-    alert("Модель Pro High доступна только с активной подпиской Pro.");
-    return;
-  }
   store.set(modelKey(currentUser.uid),$("modelSelect").value);
 });
 
